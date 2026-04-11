@@ -24,14 +24,14 @@
 
 在 GitHub 仓库的 Settings > Secrets and variables > Actions 中配置以下密钥：
 
-#### Docker Hub 配置
-- `DOCKER_USERNAME`: Docker Hub 用户名
-- `DOCKER_PASSWORD`: Docker Hub 密码或访问令牌
+#### 腾讯云镜像仓库配置
+- `TENCENT_CLOUD_ID`: 腾讯云镜像仓库登录用户名
+- `TENCENT_CLOUD_API_KEY`: 腾讯云镜像仓库登录秘钥
 
 #### 服务器部署配置
 - `SERVER_HOST`: 服务器 IP 地址或域名
-- `SERVER_USERNAME`: 服务器 SSH 用户名
-- `SERVER_SSH_KEY`: 服务器 SSH 私钥（用于无密码登录）
+- `SERVER_USER`: 服务器 SSH 用户名
+- `SSH_PRIVATE_KEY`: 服务器 SSH 私钥（用于无密码登录）
 - `SERVER_PORT`: SSH 端口（默认为 22）
 
 ### 📝 配置步骤

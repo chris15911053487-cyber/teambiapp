@@ -58,4 +58,7 @@ else
     exit 1
 fi
 
+echo "🧹 清理本地未使用镜像..."
+docker image prune -f
+
 echo "🎉 部署完成!"
