@@ -97,18 +97,71 @@ def to_excel(df_list, sheet_names):
     return output
 
 
+def app_menu():
+    """应用顶部导航菜单"""
+    st.sidebar.title("导航菜单")
+    page = st.sidebar.radio(
+        "选择页面",
+        ["首页", "数据", "配置", "关于"],
+        index=0,
+        key="app_page",
+        help="选择要查看的应用模块"
+    )
+
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("项目选项")
+    st.sidebar.write("在此切换功能模块，快速访问配置、数据和帮助页面。")
+
+    if st.sidebar.button("前往配置", use_container_width=True):
+        st.session_state.app_page = "配置"
+        page = "配置"
+
+    if st.sidebar.button("刷新数据", use_container_width=True):
+        st.experimental_rerun()
+
+    return page
+
+
+def config_page():
+    """配置页面"""
+    st.title("⚙️ 应用配置")
+    st.markdown("在此页面配置 App ID、App Secret、Access Token 和企业 ID。")
+
+    token, tenant_id = sidebar()
+
+    st.markdown("---")
+    st.subheader("当前配置状态")
+    st.write("**Access Token**: ", "已设置" if token else "未设置")
+    st.write("**企业 ID**: ", tenant_id or "未设置")
+    st.write("**页面说明**: 请确保配置完成后切换到“首页”或“数据”页面进行数据操作。 ")
+
+
+def about_page():
+    """关于页面"""
+    st.title("📘 关于 Teambition API 工具")
+    st.markdown("这是一个基于 Streamlit 的 Teambition API 数据工具，支持获取企业、项目和任务数据，并导出 Excel。")
+    st.markdown("""
+    - 单独的配置页面，便于管理 API 凭证
+    - 数据页面用于查询和展示企业信息、项目列表与任务详情
+    - 支持一键导出 Excel
+    """)
+    st.markdown("---")
+    st.markdown("**使用说明**")
+    st.markdown("1. 先进入“配置”页面配置凭证。\n2. 切换到“数据”页面获取企业信息和项目数据。\n3. 点击导出生成 Excel 文件。 ")
+
+
 def main_page():
     """主页面"""
     st.title("📊 Teambition API 工具")
     st.markdown("获取企业信息、项目列表和任务数据，并导出到 Excel")
 
     # 欢迎信息和说明
-    st.info("💡 **使用提示**: 请先在左侧边栏配置 API 凭证，然后点击下方按钮获取数据")
+    st.info("💡 **使用提示**: 请先在左侧菜单中选择“配置”页面，然后输入 API 凭证并获取 Token。")
 
     # 检查配置
     client = get_api_client()
     if not client:
-        st.warning("⚠️ 请在左侧边栏配置 Token 和企业 ID")
+        st.warning("⚠️ 请在侧边栏菜单中选择“配置”页面并完成 Token / 企业 ID 设置")
         st.markdown("""
         ### 配置步骤:
         1. 输入您的 App ID 和 App Secret
@@ -366,13 +419,18 @@ def export_data():
 
 def main():
     """主函数"""
-    # 侧边栏
-    sidebar()
-    
-    # 主页面
-    main_page()
-    
-    # 页脚
+    page = app_menu()
+
+    if page == "配置":
+        config_page()
+    elif page == "数据":
+        main_page()
+    elif page == "关于":
+        about_page()
+    else:
+        st.session_state.app_page = "首页"
+        main_page()
+
     st.markdown("---")
     st.markdown("""
     <div style='text-align: center; color: #888;'>
