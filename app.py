@@ -100,10 +100,17 @@ def to_excel(df_list, sheet_names):
 def app_menu():
     """应用顶部导航菜单"""
     st.sidebar.title("导航菜单")
+
+    if "app_page" not in st.session_state:
+        st.session_state.app_page = "首页"
+
+    if "goto_page" in st.session_state:
+        st.session_state.app_page = st.session_state.goto_page
+        del st.session_state.goto_page
+
     page = st.sidebar.radio(
         "选择页面",
         ["首页", "数据", "配置", "关于"],
-        index=0,
         key="app_page",
         help="选择要查看的应用模块"
     )
@@ -113,8 +120,8 @@ def app_menu():
     st.sidebar.write("在此切换功能模块，快速访问配置、数据和帮助页面。")
 
     if st.sidebar.button("前往配置", use_container_width=True):
-        st.session_state.app_page = "配置"
-        page = "配置"
+        st.session_state.goto_page = "配置"
+        st.experimental_rerun()
 
     if st.sidebar.button("刷新数据", use_container_width=True):
         st.experimental_rerun()
@@ -428,7 +435,6 @@ def main():
     elif page == "关于":
         about_page()
     else:
-        st.session_state.app_page = "首页"
         main_page()
 
     st.markdown("---")
