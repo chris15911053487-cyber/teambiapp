@@ -13,7 +13,7 @@ import os
 from datetime import datetime
 from io import BytesIO
 from dotenv import load_dotenv
-from config_sidebar import sidebar
+from config_sidebar import get_app_token
 
 # 加载环境变量
 load_dotenv()
@@ -102,36 +102,32 @@ def app_menu():
     st.sidebar.title("导航菜单")
 
     page_options = ["首页", "数据", "配置", "关于"]
-    if "app_menu_page" not in st.session_state:
-        st.session_state.app_menu_page = "首页"
+    if "open_tabs" not in st.session_state:
+        st.session_state.open_tabs = ["首页"]
+    if "active_tab" not in st.session_state:
+        st.session_state.active_tab = "首页"
 
-    def navigate_to(page_name: str):
-        st.session_state.app_menu_page = page_name
+    def open_tab(page_name: str):
+        if page_name not in st.session_state.open_tabs:
+            st.session_state.open_tabs.append(page_name)
+        st.session_state.active_tab = page_name
 
-    page = st.sidebar.radio(
-        "选择页面",
-        page_options,
-        key="app_menu_page",
-        help="选择要查看的应用模块"
-    )
+    st.sidebar.subheader("快速打开")
+    for page_name in page_options:
+        if st.sidebar.button(page_name, key=f"open_{page_name}"):
+            open_tab(page_name)
 
     st.sidebar.markdown("---")
-    st.sidebar.subheader("项目选项")
-    st.sidebar.write("在此切换功能模块，快速访问配置、数据和帮助页面。")
+    st.sidebar.subheader("已打开页签")
+    for tab_name in st.session_state.open_tabs:
+        st.sidebar.write(f"- {tab_name}")
 
-    st.sidebar.button(
-        "前往配置",
-        on_click=navigate_to,
-        kwargs={"page_name": "配置"},
-        use_container_width=True
-    )
+    st.sidebar.markdown("---")
+    if st.sidebar.button("关闭所有页签", use_container_width=True):
+        st.session_state.open_tabs = ["首页"]
+        st.session_state.active_tab = "首页"
 
-    st.sidebar.button(
-        "刷新数据",
-        use_container_width=True
-    )
-
-    return page
+    return st.session_state.active_tab
 
 
 def config_page():
@@ -139,12 +135,42 @@ def config_page():
     st.title("⚙️ 应用配置")
     st.markdown("在此页面配置 App ID、App Secret、Access Token 和企业 ID。")
 
-    token, tenant_id = sidebar()
+    app_id = st.text_input(
+        "App ID",
+        value=st.session_state.get('app_id', '69d216d0639800db95c6a7f8'),
+        help="Teambition 应用的 App ID"
+    )
+    app_secret = st.text_input(
+        "App Secret",
+        value=st.session_state.get('app_secret', 'j2lu9G3bfsWarbci9oA3cUFehEOP7CIM'),
+        help="Teambition 应用的 App Secret",
+        type="password"
+    )
+
+    st.session_state['app_id'] = app_id
+    st.session_state['app_secret'] = app_secret
+
+    if st.button("🔄 获取 Token", use_container_width=True):
+        with st.spinner("获取 Token 中..."):
+            try:
+                token = get_app_token(app_id, app_secret)
+                st.session_state['token'] = token
+                st.success("✅ Token 获取成功!")
+                st.info(f"Token: {token[:30]}...")
+            except Exception as e:
+                st.error(f"❌ 错误: {e}")
 
     st.markdown("---")
     st.subheader("当前配置状态")
-    st.write("**Access Token**: ", "已设置" if token else "未设置")
-    st.write("**企业 ID**: ", tenant_id or "未设置")
+    st.write("**Access Token**: ", "已设置" if st.session_state.get('token') else "未设置")
+    st.write("**企业 ID**: ", st.session_state.get('tenant_id', '未设置'))
+    tenant_id = st.text_input(
+        "企业 ID (Tenant ID)",
+        value=st.session_state.get('tenant_id', ''),
+        help="企业/组织的唯一标识"
+    )
+    st.session_state['tenant_id'] = tenant_id
+
     st.write("**页面说明**: 请确保配置完成后切换到“首页”或“数据”页面进行数据操作。 ")
 
 
@@ -429,15 +455,34 @@ def export_data():
                 st.warning("⚠️ 没有有效数据可以导出")
 
 
+def render_tab_bar():
+    """渲染右侧多页签头部"""
+    if "open_tabs" not in st.session_state:
+        st.session_state.open_tabs = ["首页"]
+    if "active_tab" not in st.session_state:
+        st.session_state.active_tab = "首页"
+
+    cols = st.columns(len(st.session_state.open_tabs))
+    for i, tab_name in enumerate(st.session_state.open_tabs):
+        if tab_name == st.session_state.active_tab:
+            cols[i].markdown(f"**{tab_name}**")
+        elif cols[i].button(tab_name, key=f"tab_{tab_name}"):
+            st.session_state.active_tab = tab_name
+
+    st.markdown("---")
+    return st.session_state.active_tab
+
+
 def main():
     """主函数"""
     page = app_menu()
+    active_tab = render_tab_bar()
 
-    if page == "配置":
+    if active_tab == "配置":
         config_page()
-    elif page == "数据":
+    elif active_tab == "数据":
         main_page()
-    elif page == "关于":
+    elif active_tab == "关于":
         about_page()
     else:
         main_page()
