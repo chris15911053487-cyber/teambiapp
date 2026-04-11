@@ -113,3 +113,6 @@ jobs:
             echo "❌ 应用部署失败"
             exit 1
           fi
+
+          # 智能清理未使用镜像
+          docker image prune -f
