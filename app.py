@@ -14,6 +14,9 @@ from datetime import datetime
 from io import BytesIO
 from dotenv import load_dotenv
 from config_sidebar import get_app_token
+from streamlit_extras.card import card
+from streamlit_extras.metric_cards import style_metric_cards
+from streamlit_option_menu import option_menu
 
 # 加载环境变量
 load_dotenv()
@@ -23,8 +26,59 @@ st.set_page_config(
     page_title="Teambition API 工具",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    menu_items={
+        'Get Help': 'https://www.teambition.com',
+        'Report a bug': "https://github.com/your-repo/issues",
+        'About': "# Teambition API Tool"
+    }
 )
+
+# 自定义CSS样式
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #1f77b4;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    .card {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin: 10px 0;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .metric-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 15px;
+        text-align: center;
+    }
+    .tab-button {
+        background-color: #e9ecef;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        margin: 0 5px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+    .tab-button.active {
+        background-color: #007bff;
+        color: white;
+    }
+    .sidebar-menu {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 15px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 
 
 class TeambitionAPI:
@@ -99,58 +153,96 @@ def to_excel(df_list, sheet_names):
 
 def app_menu():
     """应用顶部导航菜单"""
-    st.sidebar.title("导航菜单")
+    with st.sidebar:
+        st.markdown('<div class="sidebar-menu">', unsafe_allow_html=True)
 
-    page_options = ["首页", "数据", "配置", "关于"]
-    if "open_tabs" not in st.session_state:
-        st.session_state.open_tabs = ["首页"]
-    if "active_tab" not in st.session_state:
-        st.session_state.active_tab = "首页"
+        selected = option_menu(
+            menu_title="导航菜单",
+            options=["首页", "数据", "配置", "关于"],
+            icons=["house", "bar-chart", "gear", "info-circle"],
+            menu_icon="cast",
+            default_index=0,
+            styles={
+                "container": {"padding": "0!important", "background-color": "#f8f9fa"},
+                "icon": {"color": "orange", "font-size": "25px"},
+                "nav-link": {
+                    "font-size": "16px",
+                    "text-align": "left",
+                    "margin": "0px",
+                    "--hover-color": "#eee",
+                },
+                "nav-link-selected": {"background-color": "#007bff"},
+            }
+        )
 
-    def open_tab(page_name: str):
-        if page_name not in st.session_state.open_tabs:
-            st.session_state.open_tabs.append(page_name)
-        st.session_state.active_tab = page_name
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    st.sidebar.subheader("快速打开")
-    for page_name in page_options:
-        if st.sidebar.button(page_name, key=f"open_{page_name}"):
-            open_tab(page_name)
+        if "open_tabs" not in st.session_state:
+            st.session_state.open_tabs = ["首页"]
+        if "active_tab" not in st.session_state:
+            st.session_state.active_tab = "首页"
 
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("已打开页签")
-    for tab_name in st.session_state.open_tabs:
-        st.sidebar.write(f"- {tab_name}")
+        def open_tab(page_name: str):
+            if page_name not in st.session_state.open_tabs:
+                st.session_state.open_tabs.append(page_name)
+            st.session_state.active_tab = page_name
 
-    st.sidebar.markdown("---")
-    if st.sidebar.button("关闭所有页签", use_container_width=True):
-        st.session_state.open_tabs = ["首页"]
-        st.session_state.active_tab = "首页"
+        if st.button("📂 打开数据页面", use_container_width=True):
+            open_tab("数据")
+        if st.button("⚙️ 打开配置页面", use_container_width=True):
+            open_tab("配置")
+        if st.button("❌ 关闭所有页签", use_container_width=True):
+            st.session_state.open_tabs = ["首页"]
+            st.session_state.active_tab = "首页"
 
-    return st.session_state.active_tab
+    return selected
 
 
 def config_page():
     """配置页面"""
-    st.title("⚙️ 应用配置")
+    st.markdown('<h1 class="main-header">⚙️ 应用配置</h1>', unsafe_allow_html=True)
     st.markdown("在此页面配置 App ID、App Secret、Access Token 和企业 ID。")
 
-    app_id = st.text_input(
-        "App ID",
-        value=st.session_state.get('app_id', '69d216d0639800db95c6a7f8'),
-        help="Teambition 应用的 App ID"
-    )
-    app_secret = st.text_input(
-        "App Secret",
-        value=st.session_state.get('app_secret', 'j2lu9G3bfsWarbci9oA3cUFehEOP7CIM'),
-        help="Teambition 应用的 App Secret",
-        type="password"
-    )
+    with st.container():
+        col1, col2 = st.columns(2)
+
+        with col1:
+            card(
+                title="🔑 应用凭证",
+                text="配置您的 Teambition 应用 ID 和密钥",
+                image="",
+                url=""
+            )
+            app_id = st.text_input(
+                "App ID",
+                value=st.session_state.get('app_id', '69d216d0639800db95c6a7f8'),
+                help="Teambition 应用的 App ID"
+            )
+            app_secret = st.text_input(
+                "App Secret",
+                value=st.session_state.get('app_secret', 'j2lu9G3bfsWarbci9oA3cUFehEOP7CIM'),
+                help="Teambition 应用的 App Secret",
+                type="password"
+            )
+
+        with col2:
+            card(
+                title="🏢 企业信息",
+                text="配置企业 ID 和查看当前状态",
+                image="",
+                url=""
+            )
+            tenant_id = st.text_input(
+                "企业 ID (Tenant ID)",
+                value=st.session_state.get('tenant_id', ''),
+                help="企业/组织的唯一标识"
+            )
 
     st.session_state['app_id'] = app_id
     st.session_state['app_secret'] = app_secret
+    st.session_state['tenant_id'] = tenant_id
 
-    if st.button("🔄 获取 Token", use_container_width=True):
+    if st.button("🔄 获取 Token", use_container_width=True, type="primary"):
         with st.spinner("获取 Token 中..."):
             try:
                 token = get_app_token(app_id, app_secret)
@@ -161,40 +253,71 @@ def config_page():
                 st.error(f"❌ 错误: {e}")
 
     st.markdown("---")
-    st.subheader("当前配置状态")
-    st.write("**Access Token**: ", "已设置" if st.session_state.get('token') else "未设置")
-    st.write("**企业 ID**: ", st.session_state.get('tenant_id', '未设置'))
-    tenant_id = st.text_input(
-        "企业 ID (Tenant ID)",
-        value=st.session_state.get('tenant_id', ''),
-        help="企业/组织的唯一标识"
-    )
-    st.session_state['tenant_id'] = tenant_id
+    st.subheader("📊 当前配置状态")
 
-    st.write("**页面说明**: 请确保配置完成后切换到“首页”或“数据”页面进行数据操作。 ")
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Access Token", "已设置" if st.session_state.get('token') else "未设置")
+    with col2:
+        st.metric("企业 ID", tenant_id or "未设置")
+    with col3:
+        st.metric("App ID", app_id[:10] + "..." if app_id else "未设置")
+    with col4:
+        st.metric("App Secret", "已设置" if app_secret else "未设置")
+
+    style_metric_cards()
 
 
 def about_page():
     """关于页面"""
-    st.title("📘 关于 Teambition API 工具")
+    st.markdown('<h1 class="main-header">📘 关于 Teambition API 工具</h1>', unsafe_allow_html=True)
     st.markdown("这是一个基于 Streamlit 的 Teambition API 数据工具，支持获取企业、项目和任务数据，并导出 Excel。")
-    st.markdown("""
-    - 单独的配置页面，便于管理 API 凭证
-    - 数据页面用于查询和展示企业信息、项目列表与任务详情
-    - 支持一键导出 Excel
-    """)
+
+    with st.container():
+        col1, col2 = st.columns(2)
+
+        with col1:
+            card(
+                title="🚀 主要功能",
+                text="获取企业信息、项目列表和任务数据，并导出 Excel",
+                image="",
+                url=""
+            )
+
+        with col2:
+            card(
+                title="⚙️ 配置管理",
+                text="独立配置页面，便于管理 API 凭证",
+                image="",
+                url=""
+            )
+
     st.markdown("---")
     st.markdown("**使用说明**")
-    st.markdown("1. 先进入“配置”页面配置凭证。\n2. 切换到“数据”页面获取企业信息和项目数据。\n3. 点击导出生成 Excel 文件。 ")
+    st.markdown("""
+    1. 先进入"配置"页面配置凭证。
+    2. 切换到"数据"页面获取企业信息和项目数据。
+    3. 点击导出生成 Excel 文件。
+    """)
+
+    st.markdown("---")
+    st.markdown("**技术栈**")
+    tech_col1, tech_col2, tech_col3 = st.columns(3)
+    with tech_col1:
+        st.markdown("**前端**: Streamlit")
+    with tech_col2:
+        st.markdown("**后端**: Python")
+    with tech_col3:
+        st.markdown("**数据**: Pandas, OpenPyXL")
 
 
 def main_page():
     """主页面"""
-    st.title("📊 Teambition API 工具")
+    st.markdown('<h1 class="main-header">📊 Teambition API 工具</h1>', unsafe_allow_html=True)
     st.markdown("获取企业信息、项目列表和任务数据，并导出到 Excel")
 
     # 欢迎信息和说明
-    st.info("💡 **使用提示**: 请先在左侧菜单中选择“配置”页面，然后输入 API 凭证并获取 Token。")
+    st.info("💡 **使用提示**: 请先在侧边栏菜单中选择“配置”页面，然后输入 API 凭证并获取 Token。")
 
     # 检查配置
     client = get_api_client()
@@ -216,23 +339,47 @@ def main_page():
     st.markdown("---")
     st.subheader("🚀 数据获取操作")
 
-    # 操作按钮 - 使用更好的布局
+    # 操作按钮 - 使用卡片式布局
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.markdown("**🏢 企业信息**")
-        st.markdown("获取当前企业的基本信息")
-        fetch_org = st.button("获取企业信息", use_container_width=True, key="fetch_org")
+        with st.container():
+            card(
+                title="🏢 企业信息",
+                text="获取当前企业的基本信息",
+                image="",
+                url=""
+            )
+            if st.button("获取企业信息", use_container_width=True, key="fetch_org"):
+                fetch_org = True
+            else:
+                fetch_org = False
 
     with col2:
-        st.markdown("**📁 项目列表**")
-        st.markdown("获取企业下的所有项目")
-        fetch_projects = st.button("获取项目列表", use_container_width=True, key="fetch_projects")
+        with st.container():
+            card(
+                title="📁 项目列表",
+                text="获取企业下的所有项目",
+                image="",
+                url=""
+            )
+            if st.button("获取项目列表", use_container_width=True, key="fetch_projects"):
+                fetch_projects = True
+            else:
+                fetch_projects = False
 
     with col3:
-        st.markdown("**🚀 全部数据**")
-        st.markdown("获取企业信息、项目和所有任务")
-        fetch_all = st.button("获取全部数据", use_container_width=True, type="primary", key="fetch_all")
+        with st.container():
+            card(
+                title="🚀 全部数据",
+                text="获取企业信息、项目和所有任务",
+                image="",
+                url=""
+            )
+            if st.button("获取全部数据", use_container_width=True, type="primary", key="fetch_all"):
+                fetch_all = True
+            else:
+                fetch_all = False
     
     # 数据存储
     if 'org_data' not in st.session_state:
@@ -311,6 +458,7 @@ def display_data():
     # 显示企业信息
     if st.session_state.org_data:
         with st.container():
+            st.markdown('<div class="card">', unsafe_allow_html=True)
             st.markdown("### 🏢 企业信息")
             org = st.session_state.org_data
 
@@ -325,10 +473,12 @@ def display_data():
 
             with st.expander("📋 查看完整企业信息"):
                 st.json(org)
+            st.markdown('</div>', unsafe_allow_html=True)
 
     # 显示项目列表
     if st.session_state.projects_data:
         with st.container():
+            st.markdown('<div class="card">', unsafe_allow_html=True)
             st.markdown(f"### 📁 项目列表 (共 {len(st.session_state.projects_data)} 个)")
 
             # 转换为 DataFrame 显示
@@ -343,10 +493,12 @@ def display_data():
                                "created": st.column_config.TextColumn("创建时间", width="medium"),
                                "id": st.column_config.TextColumn("项目ID", width="small")
                            })
+            st.markdown('</div>', unsafe_allow_html=True)
 
     # 显示项目任务
     if st.session_state.tasks_data:
         with st.container():
+            st.markdown('<div class="card">', unsafe_allow_html=True)
             total_tasks = sum(len(data['tasks']) for data in st.session_state.tasks_data.values())
             st.markdown(f"### 📋 项目任务详情 (共 {total_tasks} 个任务)")
 
@@ -363,6 +515,7 @@ def display_data():
                         st.dataframe(tasks_df[available_task_cols], use_container_width=True)
                     else:
                         st.info("📝 此项目暂无任务")
+            st.markdown('</div>', unsafe_allow_html=True)
 
 
 def export_data():
@@ -378,6 +531,7 @@ def export_data():
         return
 
     st.markdown("---")
+    st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("📥 数据导出")
 
     # 显示数据统计
@@ -400,6 +554,8 @@ def export_data():
         with col4:
             sheet_count = has_org + (1 if st.session_state.projects_data else 0) + len([data for data in st.session_state.tasks_data.values() if data['tasks']])
             st.metric("Excel工作表", f"{sheet_count} 个")
+
+        style_metric_cards()
 
     # 导出按钮
     if st.button("📊 生成并下载 Excel 文件", use_container_width=True, type="primary"):
@@ -453,6 +609,7 @@ def export_data():
                 st.info(f"📊 包含 {len(df_list)} 个工作表: {', '.join(sheet_names)}")
             else:
                 st.warning("⚠️ 没有有效数据可以导出")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 def render_tab_bar():
@@ -462,14 +619,14 @@ def render_tab_bar():
     if "active_tab" not in st.session_state:
         st.session_state.active_tab = "首页"
 
+    st.markdown('<div style="display: flex; gap: 10px; margin-bottom: 20px;">', unsafe_allow_html=True)
     cols = st.columns(len(st.session_state.open_tabs))
     for i, tab_name in enumerate(st.session_state.open_tabs):
-        if tab_name == st.session_state.active_tab:
-            cols[i].markdown(f"**{tab_name}**")
-        elif cols[i].button(tab_name, key=f"tab_{tab_name}"):
+        button_type = "primary" if tab_name == st.session_state.active_tab else "secondary"
+        if cols[i].button(tab_name, key=f"tab_{tab_name}", type=button_type, use_container_width=True):
             st.session_state.active_tab = tab_name
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("---")
     return st.session_state.active_tab
 
 
