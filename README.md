@@ -25,8 +25,9 @@
 在 GitHub 仓库的 Settings > Secrets and variables > Actions 中配置以下密钥：
 
 #### 腾讯云镜像仓库配置
+- `REGISTRY`: 腾讯云镜像仓库地址，例如 `ccr.ccs.tencentyun.com`
 - `TENCENT_CLOUD_ID`: 腾讯云镜像仓库登录用户名
-- `TENCENT_CLOUD_API_KEY`: 腾讯云镜像仓库登录秘钥
+- `PASSWORD`: 腾讯云镜像仓库登录密码
 
 #### 服务器部署配置
 - `SERVER_HOST`: 服务器 IP 地址或域名

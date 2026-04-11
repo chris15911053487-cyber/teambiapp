@@ -55,14 +55,15 @@ jobs:
     - name: Log in to Tencent Cloud Container Registry
       uses: docker/login-action@v3
       with:
+        registry: ${{ secrets.REGISTRY }}
         username: ${{ secrets.TENCENT_CLOUD_ID }}
-        password: ${{ secrets.TENCENT_CLOUD_API_KEY }}
+        password: ${{ secrets.PASSWORD }}
 
     - name: Extract metadata
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: ${{ secrets.TENCENT_CLOUD_ID }}/teambition-app
+        images: ${{ secrets.REGISTRY }}/${{ secrets.TENCENT_CLOUD_ID }}/teambition-app
         tags: |
           type=ref,event=branch
           type=ref,event=pr
@@ -92,7 +93,7 @@ jobs:
           docker rm teambition-api-tool || true
 
           # 拉取最新镜像
-          docker pull ${{ secrets.TENCENT_CLOUD_ID }}/teambition-app:latest
+          docker pull ${{ secrets.REGISTRY }}/${{ secrets.TENCENT_CLOUD_ID }}/teambition-app:latest
 
           # 启动新容器
           docker run -d \
@@ -100,7 +101,7 @@ jobs:
             -p 8501:8501 \
             -v /opt/teambition-app/data:/app/data \
             --restart unless-stopped \
-            ${{ secrets.TENCENT_CLOUD_ID }}/teambition-app:latest
+            ${{ secrets.REGISTRY }}/${{ secrets.TENCENT_CLOUD_ID }}/teambition-app:latest
 
           # 等待应用启动
           sleep 10
