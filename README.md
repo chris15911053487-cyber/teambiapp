@@ -28,7 +28,7 @@
 - `REGISTRY`: 腾讯云镜像仓库地址，例如 `ccr.ccs.tencentyun.com`
 - `TENCENT_CLOUD_ID`: 腾讯云镜像仓库登录用户名
 - `PASSWORD`: 腾讯云镜像仓库登录密码
-- `REGISTRY_NAMESPACE`: 镜像仓库命名空间（通常是你在 CCR 中的仓库所属命名空间）
+- `IMAGE_NAME`: 完整镜像仓库路径，例如 `ccr.ccs.tencentyun.com/命名空间/teambition-app`
 
 #### 服务器部署配置
 - `SERVER_HOST`: 服务器 IP 地址或域名
