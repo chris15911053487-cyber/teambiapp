@@ -101,17 +101,17 @@ def app_menu():
     """应用顶部导航菜单"""
     st.sidebar.title("导航菜单")
 
-    if "app_page" not in st.session_state:
-        st.session_state.app_page = "首页"
+    page_options = ["首页", "数据", "配置", "关于"]
+    if "app_menu_page" not in st.session_state:
+        st.session_state.app_menu_page = "首页"
 
-    if "goto_page" in st.session_state:
-        st.session_state.app_page = st.session_state.goto_page
-        del st.session_state.goto_page
+    def navigate_to(page_name: str):
+        st.session_state.app_menu_page = page_name
 
     page = st.sidebar.radio(
         "选择页面",
-        ["首页", "数据", "配置", "关于"],
-        key="app_page",
+        page_options,
+        key="app_menu_page",
         help="选择要查看的应用模块"
     )
 
@@ -119,12 +119,17 @@ def app_menu():
     st.sidebar.subheader("项目选项")
     st.sidebar.write("在此切换功能模块，快速访问配置、数据和帮助页面。")
 
-    if st.sidebar.button("前往配置", use_container_width=True):
-        st.session_state.goto_page = "配置"
-        st.experimental_rerun()
+    st.sidebar.button(
+        "前往配置",
+        on_click=navigate_to,
+        kwargs={"page_name": "配置"},
+        use_container_width=True
+    )
 
-    if st.sidebar.button("刷新数据", use_container_width=True):
-        st.experimental_rerun()
+    st.sidebar.button(
+        "刷新数据",
+        use_container_width=True
+    )
 
     return page
 
