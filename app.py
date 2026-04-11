@@ -13,6 +13,7 @@ import os
 from datetime import datetime
 from io import BytesIO
 from dotenv import load_dotenv
+from config_sidebar import sidebar
 
 # 加载环境变量
 load_dotenv()
@@ -96,123 +97,51 @@ def to_excel(df_list, sheet_names):
     return output
 
 
-def get_app_token(app_id: str, app_secret: str) -> str:
-    """
-    通过 appId 和 appSecret 获取 Token
-    
-    Args:
-        app_id: 应用 ID
-        app_secret: 应用密钥
-        
-    Returns:
-        app_token: 访问令牌
-    """
-    url = "https://open.teambition.com/api/appToken"
-    payload = {
-        "appId": app_id,
-        "appSecret": app_secret
-    }
-    
-    response = requests.post(url, json=payload, timeout=10)
-    result = response.json()
-    
-    if "appToken" not in result:
-        raise Exception(f"获取 Token 失败: {result}")
-    
-    return result["appToken"]
-
-
-def sidebar():
-    """侧边栏配置"""
-    st.sidebar.title("⚙️ 配置")
-    
-    # 应用凭证配置
-    st.sidebar.subheader("🔑 应用凭证")
-    
-    app_id = st.sidebar.text_input(
-        "App ID",
-        value=st.session_state.get('app_id', '69d216d0639800db95c6a7f8'),
-        help="Teambition 应用的 App ID"
-    )
-    
-    app_secret = st.sidebar.text_input(
-        "App Secret",
-        value=st.session_state.get('app_secret', 'j2lu9G3bfsWarbci9oA3cUFehEOP7CIM'),
-        help="Teambition 应用的 App Secret",
-        type="password"
-    )
-    
-    # 保存到 session
-    st.session_state['app_id'] = app_id
-    st.session_state['app_secret'] = app_secret
-    
-    # 获取 Token 按钮
-    if st.sidebar.button("🔄 获取 Token", use_container_width=True):
-        with st.spinner("获取 Token 中..."):
-            try:
-                token = get_app_token(app_id, app_secret)
-                st.session_state['token'] = token
-                st.sidebar.success("✅ Token 获取成功!")
-                st.sidebar.info(f"Token: {token[:30]}...")
-            except Exception as e:
-                st.sidebar.error(f"❌ 错误: {e}")
-    
-    st.sidebar.markdown("---")
-    
-    # Token 输入（可以手动输入或自动获取）
-    token = st.sidebar.text_input(
-        "Access Token (可选)",
-        value=st.session_state.get('token', ''),
-        help="自动获取失败时可手动输入",
-        type="password"
-    )
-    
-    # 企业 ID 输入
-    tenant_id = st.sidebar.text_input(
-        "企业 ID (Tenant ID)",
-        value=st.session_state.get('tenant_id', '69c9f3992912b1e898c974f3'),
-        help="企业/组织的唯一标识"
-    )
-    
-    # 保存到 session
-    st.session_state['token'] = token
-    st.session_state['tenant_id'] = tenant_id
-    
-    # 使用说明
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("""
-    ### 📖 使用说明
-    
-    **方式一（推荐）**: 输入 App ID 和 App Secret，点击"获取 Token"
-    
-    **方式二**: 手动从开放平台复制 Token 粘贴
-    
-    **Token 有效期**: 约 30 分钟
-    """)
-    
-    return token, tenant_id
-
-
 def main_page():
     """主页面"""
     st.title("📊 Teambition API 工具")
     st.markdown("获取企业信息、项目列表和任务数据，并导出到 Excel")
-    
+
+    # 欢迎信息和说明
+    st.info("💡 **使用提示**: 请先在左侧边栏配置 API 凭证，然后点击下方按钮获取数据")
+
     # 检查配置
     client = get_api_client()
     if not client:
         st.warning("⚠️ 请在左侧边栏配置 Token 和企业 ID")
+        st.markdown("""
+        ### 配置步骤:
+        1. 输入您的 App ID 和 App Secret
+        2. 点击"获取 Token"按钮
+        3. 或者直接输入已有的 Access Token
+        4. 输入企业 ID (Tenant ID)
+        """)
         return
-    
-    # 操作按钮
+
+    # 状态指示器
+    st.success("✅ API 配置完成，可以开始获取数据")
+
+    # 操作按钮区域
+    st.markdown("---")
+    st.subheader("🚀 数据获取操作")
+
+    # 操作按钮 - 使用更好的布局
     col1, col2, col3 = st.columns(3)
-    
+
     with col1:
-        fetch_org = st.button("🏢 获取企业信息", use_container_width=True)
+        st.markdown("**🏢 企业信息**")
+        st.markdown("获取当前企业的基本信息")
+        fetch_org = st.button("获取企业信息", use_container_width=True, key="fetch_org")
+
     with col2:
-        fetch_projects = st.button("📁 获取项目列表", use_container_width=True)
+        st.markdown("**📁 项目列表**")
+        st.markdown("获取企业下的所有项目")
+        fetch_projects = st.button("获取项目列表", use_container_width=True, key="fetch_projects")
+
     with col3:
-        fetch_all = st.button("🚀 获取全部数据", use_container_width=True, type="primary")
+        st.markdown("**🚀 全部数据**")
+        st.markdown("获取企业信息、项目和所有任务")
+        fetch_all = st.button("获取全部数据", use_container_width=True, type="primary", key="fetch_all")
     
     # 数据存储
     if 'org_data' not in st.session_state:
@@ -275,84 +204,130 @@ def main_page():
 
 def display_data():
     """显示获取的数据"""
-    
+
+    # 检查是否有数据
+    has_data = (st.session_state.org_data or
+                st.session_state.projects_data or
+                st.session_state.tasks_data)
+
+    if not has_data:
+        st.info("ℹ️ 暂无数据，请先获取数据")
+        return
+
+    st.markdown("---")
+    st.subheader("📊 数据展示")
+
     # 显示企业信息
     if st.session_state.org_data:
-        st.markdown("---")
-        st.subheader("🏢 企业信息")
-        org = st.session_state.org_data
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("企业名称", org.get('name', 'N/A'))
-        with col2:
-            st.metric("企业 ID", org.get('orgId', 'N/A'))
-        with col3:
-            st.metric("创建时间", org.get('created', 'N/A'))
-        
-        with st.expander("查看详细信息"):
-            st.json(org)
-    
+        with st.container():
+            st.markdown("### 🏢 企业信息")
+            org = st.session_state.org_data
+
+            # 使用卡片式布局
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("企业名称", org.get('name', 'N/A'))
+            with col2:
+                st.metric("企业 ID", org.get('orgId', 'N/A'))
+            with col3:
+                st.metric("创建时间", org.get('created', 'N/A'))
+
+            with st.expander("📋 查看完整企业信息"):
+                st.json(org)
+
     # 显示项目列表
     if st.session_state.projects_data:
-        st.markdown("---")
-        st.subheader(f"📁 项目列表 (共 {len(st.session_state.projects_data)} 个)")
-        
-        # 转换为 DataFrame 显示
-        projects_df = pd.DataFrame(st.session_state.projects_data)
-        if not projects_df.empty:
-            display_cols = ['name', 'description', 'created', 'id']
-            available_cols = [c for c in display_cols if c in projects_df.columns]
-            st.dataframe(projects_df[available_cols], use_container_width=True)
-        
-        # 显示每个项目的任务
-        if st.session_state.tasks_data:
-            st.markdown("---")
-            st.subheader("📋 项目任务")
-            
+        with st.container():
+            st.markdown(f"### 📁 项目列表 (共 {len(st.session_state.projects_data)} 个)")
+
+            # 转换为 DataFrame 显示
+            projects_df = pd.DataFrame(st.session_state.projects_data)
+            if not projects_df.empty:
+                display_cols = ['name', 'description', 'created', 'id']
+                available_cols = [c for c in display_cols if c in projects_df.columns]
+                st.dataframe(projects_df[available_cols], use_container_width=True,
+                           column_config={
+                               "name": st.column_config.TextColumn("项目名称", width="medium"),
+                               "description": st.column_config.TextColumn("描述", width="large"),
+                               "created": st.column_config.TextColumn("创建时间", width="medium"),
+                               "id": st.column_config.TextColumn("项目ID", width="small")
+                           })
+
+    # 显示项目任务
+    if st.session_state.tasks_data:
+        with st.container():
+            total_tasks = sum(len(data['tasks']) for data in st.session_state.tasks_data.values())
+            st.markdown(f"### 📋 项目任务详情 (共 {total_tasks} 个任务)")
+
             for project_id, data in st.session_state.tasks_data.items():
                 project_name = data['name']
                 tasks = data['tasks']
-                
+
                 with st.expander(f"📂 {project_name} ({len(tasks)} 个任务)"):
                     if tasks:
                         tasks_df = pd.DataFrame(tasks)
-                        st.dataframe(tasks_df, use_container_width=True)
+                        # 选择要显示的列
+                        task_cols = ['name', 'content', 'executor', 'stage', 'created', 'updated']
+                        available_task_cols = [c for c in task_cols if c in tasks_df.columns]
+                        st.dataframe(tasks_df[available_task_cols], use_container_width=True)
                     else:
-                        st.info("暂无任务")
+                        st.info("📝 此项目暂无任务")
 
 
 def export_data():
     """导出数据到 Excel"""
-    
+
     # 检查是否有数据可以导出
-    has_data = (st.session_state.org_data or 
-                st.session_state.projects_data or 
+    has_data = (st.session_state.org_data or
+                st.session_state.projects_data or
                 st.session_state.tasks_data)
-    
+
     if not has_data:
+        st.info("ℹ️ 暂无数据可以导出，请先获取数据")
         return
-    
+
     st.markdown("---")
-    st.subheader("📥 导出数据")
-    
-    if st.button("📊 生成 Excel 文件", use_container_width=True):
-        with st.spinner("生成 Excel 文件中..."):
+    st.subheader("📥 数据导出")
+
+    # 显示数据统计
+    with st.container():
+        st.markdown("### 📈 数据统计")
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            has_org = 1 if st.session_state.org_data else 0
+            st.metric("企业信息", f"{has_org} 条")
+
+        with col2:
+            project_count = len(st.session_state.projects_data) if st.session_state.projects_data else 0
+            st.metric("项目数量", f"{project_count} 个")
+
+        with col3:
+            task_count = sum(len(data['tasks']) for data in st.session_state.tasks_data.values()) if st.session_state.tasks_data else 0
+            st.metric("任务总数", f"{task_count} 个")
+
+        with col4:
+            sheet_count = has_org + (1 if st.session_state.projects_data else 0) + len([data for data in st.session_state.tasks_data.values() if data['tasks']])
+            st.metric("Excel工作表", f"{sheet_count} 个")
+
+    # 导出按钮
+    if st.button("📊 生成并下载 Excel 文件", use_container_width=True, type="primary"):
+        with st.spinner("正在生成 Excel 文件..."):
             df_list = []
             sheet_names = []
-            
+
             # 企业信息
             if st.session_state.org_data:
                 org_df = pd.DataFrame([st.session_state.org_data])
                 df_list.append(org_df)
                 sheet_names.append("企业信息")
-            
+
             # 项目列表
             if st.session_state.projects_data:
                 projects_df = pd.DataFrame(st.session_state.projects_data)
                 df_list.append(projects_df)
                 sheet_names.append("项目列表")
-            
+
             # 任务数据（每个项目一个 sheet）
             if st.session_state.tasks_data:
                 for project_id, data in st.session_state.tasks_data.items():
@@ -360,19 +335,20 @@ def export_data():
                     project_name = data['name']
                     if tasks:
                         tasks_df = pd.DataFrame(tasks)
-                        # 限制 sheet 名称长度
-                        sheet_name = f"任务-{project_name[:20]}"
+                        # 限制 sheet 名称长度，避免特殊字符
+                        safe_name = "".join(c for c in project_name if c.isalnum() or c in (' ', '-', '_')).rstrip()
+                        sheet_name = f"任务-{safe_name[:15]}" if safe_name else f"任务-{project_id[:8]}"
                         df_list.append(tasks_df)
                         sheet_names.append(sheet_name)
-            
+
             # 生成 Excel
             if df_list:
                 excel_data = to_excel(df_list, sheet_names)
-                
+
                 # 下载按钮
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"teambition_data_{timestamp}.xlsx"
-                
+
                 st.download_button(
                     label="⬇️ 下载 Excel 文件",
                     data=excel_data,
@@ -380,10 +356,12 @@ def export_data():
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True
                 )
-                
-                st.success(f"✅ 文件生成成功: {filename}")
+
+                st.success(f"✅ Excel 文件生成成功!")
+                st.info(f"📁 文件名: {filename}")
+                st.info(f"📊 包含 {len(df_list)} 个工作表: {', '.join(sheet_names)}")
             else:
-                st.warning("没有数据可以导出")
+                st.warning("⚠️ 没有有效数据可以导出")
 
 
 def main():
