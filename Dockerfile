@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 复制应用代码
 COPY app.py .
+COPY config_sidebar.py .
 COPY .env.example .env.example
 
 # 暴露端口
