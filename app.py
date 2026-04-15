@@ -337,6 +337,12 @@ def main_page():
         4. 输入企业 ID (Tenant ID)
         """)
         return
+    
+    # 初始化所有获取标志
+    fetch_org = False
+    fetch_projects = False
+    fetch_all = False
+    fetch_worktime = False
 
     # 顶部标题栏
     st.markdown("""
