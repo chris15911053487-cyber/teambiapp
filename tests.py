@@ -77,7 +77,7 @@ class TestTeambitionAPI(unittest.TestCase):
 
     @patch('app.requests.request')
     def test_get_projects(self, mock_request):
-        """测试获取项目列表"""
+        """测试获取项目列表（游标分页，首包无 nextPageToken 即结束）"""
         mock_response = Mock()
         mock_response.json.return_value = {"code": 200, "result": [{"id": "1", "name": "Project 1"}]}
         mock_request.return_value = mock_response
@@ -87,6 +87,32 @@ class TestTeambitionAPI(unittest.TestCase):
         self.assertEqual(result, [{"id": "1", "name": "Project 1"}])
         mock_request.assert_called_with("GET", "https://open.teambition.com/api/v3/project/query",
                                       headers=self.api._get_headers(), params={"pageSize": 10})
+
+    @patch('app.requests.request')
+    def test_get_projects_two_batches(self, mock_request):
+        """第二包携带 pageToken，合并两页结果"""
+        def make_resp(payload):
+            m = Mock()
+            m.json.return_value = payload
+            return m
+
+        mock_request.side_effect = [
+            make_resp({"code": 200, "result": [{"id": "a"}], "nextPageToken": "tok2"}),
+            make_resp({"code": 200, "result": [{"id": "b"}], "nextPageToken": None}),
+        ]
+
+        result = self.api.get_projects(page_size=10)
+
+        self.assertEqual(result, [{"id": "a"}, {"id": "b"}])
+        self.assertEqual(mock_request.call_count, 2)
+        mock_request.assert_any_call(
+            "GET", "https://open.teambition.com/api/v3/project/query",
+            headers=self.api._get_headers(), params={"pageSize": 10},
+        )
+        mock_request.assert_any_call(
+            "GET", "https://open.teambition.com/api/v3/project/query",
+            headers=self.api._get_headers(), params={"pageSize": 10, "pageToken": "tok2"},
+        )
 
     @patch('app.requests.request')
     def test_get_project_tasks(self, mock_request):

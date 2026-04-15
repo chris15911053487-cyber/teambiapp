@@ -113,41 +113,79 @@ class TeambitionAPI:
     def get_org_info(self):
         """获取企业信息"""
         return self._request("GET", "/org/info")
-    
+
+    @staticmethod
+    def project_query_next_token(result: dict):
+        """解析「查询项目」响应中的下一页游标（兼容多种字段名）。"""
+        if not result:
+            return None
+        return (
+            result.get("nextPageToken")
+            or result.get("next_page_token")
+            or result.get("nextToken")
+        )
+
+    def query_projects_page(self, page_size: int = 50, page_token=None):
+        """
+        单次调用「查询项目」。
+        Teambition Open API v3 的 /v3/project/query 使用 pageToken / nextPageToken 游标分页；
+        使用 page 数字分页在多数环境下会被忽略，导致每页都返回同一批数据，表现为页数暴涨、条数重复。
+        """
+        params: dict = {"pageSize": page_size}
+        if page_token:
+            params["pageToken"] = page_token
+        return self._request("GET", "/v3/project/query", params=params)
+
     def get_projects(self, page_size: int = 50):
-        """获取项目列表（支持分页）"""
+        """获取全部项目（游标分页，直至无 nextPageToken）。"""
         all_projects = []
-        page = 1
-        
+        page_token = None
+        prev_first_id = None
+
         while True:
-            result = self._request("GET", "/v3/project/query", 
-                                  params={"pageSize": page_size, "page": page})
-            projects = result.get("result", [])
+            result = self.query_projects_page(page_size, page_token)
+            projects = result.get("result") or []
+
+            if projects:
+                first_id = projects[0].get("id")
+                if prev_first_id is not None and first_id == prev_first_id:
+                    raise RuntimeError(
+                        "分页异常：连续两页首条项目 ID 相同，疑似接口未正确翻页（请勿仅使用 page 数字）。"
+                        "已中止，请检查是否使用 nextPageToken / pageToken。"
+                    )
+                prev_first_id = first_id
+
             all_projects.extend(projects)
-            
-            # 检查是否还有更多数据
-            if len(projects) < page_size:
+            page_token = self.project_query_next_token(result)
+            if not page_token:
                 break
-            page += 1
-        
+
         return all_projects
     
     def get_project_tasks(self, project_id: str, page_size: int = 50):
-        """获取项目任务（支持分页）"""
+        """获取项目任务（游标分页，与查询项目一致）。"""
         all_tasks = []
-        page = 1
-        
+        page_token = None
+        prev_first_id = None
+
         while True:
-            result = self._request("GET", f"/v3/project/{project_id}/task/query",
-                                  params={"pageSize": page_size, "page": page})
-            tasks = result.get("result", [])
+            params = {"pageSize": page_size}
+            if page_token:
+                params["pageToken"] = page_token
+            result = self._request("GET", f"/v3/project/{project_id}/task/query", params=params)
+            tasks = result.get("result") or []
+            if tasks:
+                first_id = tasks[0].get("id")
+                if prev_first_id is not None and first_id == prev_first_id:
+                    raise RuntimeError(
+                        "任务分页异常：连续两批首条任务 ID 相同，疑似未正确翻页。"
+                    )
+                prev_first_id = first_id
             all_tasks.extend(tasks)
-            
-            # 检查是否还有更多数据
-            if len(tasks) < page_size:
+            page_token = self.project_query_next_token(result)
+            if not page_token:
                 break
-            page += 1
-        
+
         return all_tasks
     
     def get_task_worktime(self, task_id: str):
@@ -522,13 +560,21 @@ def main_page():
             if analyze_btn:
                 with st.spinner("分析中..."):
                     try:
-                        first_page = client._request("GET", "/v3/project/query", params={"pageSize": 50, "page": 1})
-                        total = first_page.get("total", 0) or 0
+                        first_page = client.query_projects_page(50, None)
+                        total = (
+                            first_page.get("total")
+                            or first_page.get("totalSize")
+                            or first_page.get("total_size")
+                            or 0
+                        )
+                        if total:
+                            total = int(total)
                         projects = first_page.get("result", [])
                         if total > 0:
                             estimated_pages = (total + 50 - 1) // 50
                         elif len(projects) > 0:
-                            estimated_pages = 10  # 默认预估10页
+                            # 接口未给 total 时无法预估总页数；旧版写死 10 页会误导（实际可能上百页）
+                            estimated_pages = None
                         else:
                             estimated_pages = 1
                         st.session_state.projects_estimated_pages = estimated_pages
@@ -546,17 +592,35 @@ def main_page():
                 first_page = st.session_state.projects_analysis_api_response
                 projects = first_page.get("result", [])
                 estimated_pages = st.session_state.projects_estimated_pages
-                total = first_page.get("total", 0) or 0
+                total = (
+                    first_page.get("total")
+                    or first_page.get("totalSize")
+                    or first_page.get("total_size")
+                    or 0
+                )
+                if total:
+                    total = int(total)
                 with st.expander("🔍 查看API响应详情"):
                     st.json(first_page)
                 if not total and len(projects) > 0:
-                    st.info("💡 API未返回总数，基于第一页数据预估...")
+                    st.info(
+                        "💡 **API 未返回总条数**时无法预估批次数；项目列表使用 **nextPageToken 游标**翻页，"
+                        "直至响应中无下一页令牌为止（与「每页是否满 50 条」无必然关系）。"
+                    )
                 st.success("✅ 分析完成！")
+                pages_line = (
+                    f"<p style=\"margin: 5px 0;\"><strong>预估总页数：</strong>{estimated_pages} 页</p>"
+                    if estimated_pages is not None
+                    else (
+                        "<p style=\"margin: 5px 0;\"><strong>预估总页数：</strong>未知（接口未返回总数；"
+                        "将按游标拉取直至无 nextPageToken）</p>"
+                    )
+                )
                 st.markdown(f"""
                 <div style="border: 1px solid #86efac; border-radius: 8px; padding: 15px; margin: 15px 0;">
                     <h4 style="color: #166534; margin-top: 0; margin-bottom: 10px;">📋 预估信息</h4>
                     <p style="margin: 5px 0;"><strong>第一页项目数：</strong>{len(projects)} 个</p>
-                    <p style="margin: 5px 0;"><strong>预估总页数：</strong>{estimated_pages} 页</p>
+                    {pages_line}
                     <p style="margin: 5px 0;"><strong>每页数据量：</strong>50 个项目</p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -589,27 +653,40 @@ def main_page():
                 
                 try:
                     all_projects = []
-                    page = 1
+                    page_token = None
+                    batch = 0
                     estimated_pages = st.session_state.projects_estimated_pages
-                    
+                    prev_first_id = None
+
                     while True:
-                        status_text.text(f"正在获取第 {page} 页数据...")
-                        
-                        result = client._request("GET", "/v3/project/query", params={"pageSize": 50, "page": page})
-                        projects = result.get("result", [])
-                        all_projects.extend(projects)
-                        
-                        # 更新进度 - 使用更动态的方式
-                        if page <= estimated_pages:
-                            progress = min(page / estimated_pages, 0.95)
+                        batch += 1
+                        if estimated_pages:
+                            status_text.text(f"正在获取第 {batch} / 约 {estimated_pages} 批（游标分页）…")
                         else:
-                            progress = 0.95
+                            status_text.text(f"正在获取第 {batch} 批（游标分页，无 nextPageToken 即结束）…")
+
+                        result = client.query_projects_page(50, page_token)
+                        projects = result.get("result") or []
+                        if projects:
+                            first_id = projects[0].get("id")
+                            if prev_first_id is not None and first_id == prev_first_id:
+                                raise RuntimeError(
+                                    "分页异常：连续两批首条项目相同，疑似未正确使用游标翻页。"
+                                    "若曾出现数百「页」而实际项目仅数百个，多为旧版误用 page 参数导致重复拉取。"
+                                )
+                            prev_first_id = first_id
+
+                        all_projects.extend(projects)
+
+                        if estimated_pages and estimated_pages > 0:
+                            progress = min(batch / estimated_pages, 0.95)
+                        else:
+                            progress = min(0.95, batch / (batch + 1))
                         progress_bar.progress(progress)
-                        
-                        # 检查是否还有更多数据
-                        if len(projects) < 50:
+
+                        page_token = TeambitionAPI.project_query_next_token(result)
+                        if not page_token:
                             break
-                        page += 1
                     
                     st.session_state.projects_data = all_projects
                     progress_bar.progress(1.0)
