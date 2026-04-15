@@ -136,10 +136,22 @@ class TeambitionAPI:
         return all_projects
     
     def get_project_tasks(self, project_id: str, page_size: int = 50):
-        """获取项目任务"""
-        result = self._request("GET", f"/v3/project/{project_id}/task/query",
-                              params={"pageSize": page_size})
-        return result.get("result", [])
+        """获取项目任务（支持分页）"""
+        all_tasks = []
+        page = 1
+        
+        while True:
+            result = self._request("GET", f"/v3/project/{project_id}/task/query",
+                                  params={"pageSize": page_size, "page": page})
+            tasks = result.get("result", [])
+            all_tasks.extend(tasks)
+            
+            # 检查是否还有更多数据
+            if len(tasks) < page_size:
+                break
+            page += 1
+        
+        return all_tasks
     
     def get_task_worktime(self, task_id: str):
         """获取任务工时"""
@@ -409,6 +421,8 @@ def main_page():
                 projects = client.get_projects(page_size=50)
                 st.session_state.projects_data = projects
                 st.success(f"✅ 找到 {len(projects)} 个项目!")
+                if len(projects) > 50:
+                    st.info(f"💡 为了避免界面卡顿，在数据展示中只显示前 50 个项目。")
             except Exception as e:
                 st.error(f"❌ 错误: {e}")
     
