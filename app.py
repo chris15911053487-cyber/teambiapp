@@ -218,40 +218,38 @@ def config_page():
     st.markdown('<h1 class="main-header">⚙️ 应用配置</h1>', unsafe_allow_html=True)
     st.markdown("在此页面配置 App ID、App Secret、Access Token 和企业 ID。")
 
-    with st.container():
-        col1, col2 = st.columns(2)
-
-        with col1:
-            card(
-                title="🔑 应用凭证",
-                text="配置您的 Teambition 应用 ID 和密钥",
-                image="",
-                url=""
-            )
-            app_id = st.text_input(
-                "App ID",
-                value=st.session_state.get('app_id', '69d216d0639800db95c6a7f8'),
-                help="Teambition 应用的 App ID"
-            )
-            app_secret = st.text_input(
-                "App Secret",
-                value=st.session_state.get('app_secret', 'j2lu9G3bfsWarbci9oA3cUFehEOP7CIM'),
-                help="Teambition 应用的 App Secret",
-                type="password"
-            )
-
-        with col2:
-            card(
-                title="🏢 企业信息",
-                text="配置企业 ID 和查看当前状态",
-                image="",
-                url=""
-            )
-            tenant_id = st.text_input(
-                "企业 ID (Tenant ID)",
-                value=st.session_state.get('tenant_id', ''),
-                help="企业/组织的唯一标识"
-            )
+    # 使用紧凑的一行布局
+    st.markdown('<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 20px;">', unsafe_allow_html=True)
+    
+    # 应用凭证部分
+    st.markdown('<div style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
+    st.markdown('### 🔑 应用凭证')
+    st.markdown('配置您的 Teambition 应用 ID 和密钥')
+    app_id = st.text_input(
+        "App ID",
+        value=st.session_state.get('app_id', '69d216d0639800db95c6a7f8'),
+        help="Teambition 应用的 App ID"
+    )
+    app_secret = st.text_input(
+        "App Secret",
+        value=st.session_state.get('app_secret', 'j2lu9G3bfsWarbci9oA3cUFehEOP7CIM'),
+        help="Teambition 应用的 App Secret",
+        type="password"
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # 企业信息部分
+    st.markdown('<div style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
+    st.markdown('### 🏢 企业信息')
+    st.markdown('配置企业 ID 和查看当前状态')
+    tenant_id = st.text_input(
+        "企业 ID (Tenant ID)",
+        value=st.session_state.get('tenant_id', ''),
+        help="企业/组织的唯一标识"
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
     st.session_state['app_id'] = app_id
     st.session_state['app_secret'] = app_secret
