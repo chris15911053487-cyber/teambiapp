@@ -218,53 +218,40 @@ def config_page():
     st.markdown('<h1 class="main-header">⚙️ 应用配置</h1>', unsafe_allow_html=True)
     st.markdown("在此页面配置 App ID、App Secret、Access Token 和企业 ID。")
 
-    # 使用紧凑的一行布局
-    st.markdown('<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 20px;">', unsafe_allow_html=True)
+    # 固定配置值（不显示给用户）
+    app_id = "69c9def37c12e5933cd9ca4f"
+    app_secret = "x6FKGCHbRhc9rmZEMMzRHjVVNTNe6Vfo"
+    tenant_id = "5e2558954f68db000132597c"
     
-    # 应用凭证部分
-    st.markdown('<div style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
-    st.markdown('### 🔑 应用凭证')
-    st.markdown('配置您的 Teambition 应用 ID 和密钥')
-    app_id = st.text_input(
-        "App ID",
-        value=st.session_state.get('app_id', '69d216d0639800db95c6a7f8'),
-        help="Teambition 应用的 App ID"
-    )
-    app_secret = st.text_input(
-        "App Secret",
-        value=st.session_state.get('app_secret', 'j2lu9G3bfsWarbci9oA3cUFehEOP7CIM'),
-        help="Teambition 应用的 App Secret",
-        type="password"
-    )
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # 企业信息部分
-    st.markdown('<div style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
-    st.markdown('### 🏢 企业信息')
-    st.markdown('配置企业 ID 和查看当前状态')
-    tenant_id = st.text_input(
-        "企业 ID (Tenant ID)",
-        value=st.session_state.get('tenant_id', ''),
-        help="企业/组织的唯一标识"
-    )
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-
+    # 保存到 session state
     st.session_state['app_id'] = app_id
     st.session_state['app_secret'] = app_secret
     st.session_state['tenant_id'] = tenant_id
 
     if st.button("🔄 获取 Token", use_container_width=True, type="primary"):
-        with st.spinner("获取 Token 中..."):
-            try:
-                token = get_app_token(app_id, app_secret)
-                st.session_state['token'] = token
-                st.success("✅ Token 获取成功!")
-                st.caption("以下为完整 Access Token，可全选复制：")
-                st.code(token, language=None)
-            except Exception as e:
-                st.error(f"❌ 错误: {e}")
+        # 弹出暗号输入框
+        with st.form(key='password_form'):
+            st.markdown("### 请输入暗号")
+            st.markdown("提示：暗号由 yyyymmdd 构成，例如今天是 20260415")
+            password = st.text_input("暗号", type="password")
+            submit_button = st.form_submit_button("验证并获取 Token")
+            
+            if submit_button:
+                # 验证暗号
+                import datetime
+                today = datetime.datetime.now().strftime("%Y%m%d")
+                if password == today:
+                    with st.spinner("获取 Token 中..."):
+                        try:
+                            token = get_app_token(app_id, app_secret)
+                            st.session_state['token'] = token
+                            st.success("✅ Token 获取成功!")
+                            st.caption("以下为完整 Access Token，可全选复制：")
+                            st.code(token, language=None)
+                        except Exception as e:
+                            st.error(f"❌ 错误: {e}")
+                else:
+                    st.error("❌ 暗号错误，请重新输入")
 
     st.markdown("---")
     st.subheader("📊 当前配置状态")
@@ -539,15 +526,24 @@ def display_data():
             # 转换为 DataFrame 显示
             projects_df = pd.DataFrame(st.session_state.projects_data)
             if not projects_df.empty:
+                total_projects = len(projects_df)
+                st.markdown(f"**项目总数**: {total_projects} 个")
+                st.markdown(f"**显示**: 前 50 个项目")
+                
+                # 只显示前50个项目
+                display_df = projects_df.head(50)
+                
                 display_cols = ['name', 'status', 'created', 'id']
-                available_cols = [c for c in display_cols if c in projects_df.columns]
-                st.dataframe(projects_df[available_cols], use_container_width=True,
+                available_cols = [c for c in display_cols if c in display_df.columns]
+                st.dataframe(display_df[available_cols], use_container_width=True,
                            column_config={
                                "name": st.column_config.TextColumn("项目名称", width="medium"),
                                "status": st.column_config.TextColumn("项目状态", width="small"),
                                "created": st.column_config.TextColumn("创建时间", width="medium"),
                                "id": st.column_config.TextColumn("项目ID", width="small")
                            })
+                if total_projects > 50:
+                    st.info(f"💡 为了避免界面卡顿，只显示了前 50 个项目。导出 Excel 时会包含所有 {total_projects} 个项目。")
             st.markdown('</div>', unsafe_allow_html=True)
 
     # 显示项目任务
