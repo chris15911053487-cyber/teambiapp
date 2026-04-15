@@ -45,7 +45,6 @@ st.markdown("""
         margin-bottom: 2rem;
     }
     .card {
-        background-color: #f8f9fa;
         border-radius: 10px;
         padding: 20px;
         margin: 10px 0;
@@ -59,7 +58,6 @@ st.markdown("""
         text-align: center;
     }
     .tab-button {
-        background-color: #e9ecef;
         border: none;
         border-radius: 5px;
         padding: 10px 20px;
@@ -72,7 +70,6 @@ st.markdown("""
         color: white;
     }
     .sidebar-menu {
-        background-color: #f8f9fa;
         border-radius: 10px;
         padding: 15px;
     }
@@ -197,13 +194,12 @@ def app_menu():
             menu_icon="cast",
             default_index=0,
             styles={
-                "container": {"padding": "10px", "background-color": "#f8f9fa", "border-radius": "10px"},
+                "container": {"padding": "10px", "border-radius": "10px"},
                 "icon": {"color": "#007bff", "font-size": "20px"},
                 "nav-link": {
                     "font-size": "15px",
                     "text-align": "left",
                     "margin": "5px 0",
-                    "--hover-color": "#e6f2ff",
                     "padding": "10px 15px",
                 },
                 "nav-link-selected": {"background-color": "#007bff", "color": "white"},
@@ -353,7 +349,7 @@ def main_page():
     st.markdown('<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 15px;">', unsafe_allow_html=True)
     
     # 企业信息卡片
-    st.markdown('<div style="background-color: #f8f9fa; border-radius: 6px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
+    st.markdown('<div style="border-radius: 6px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
     st.markdown('**企业信息**')
     st.markdown('获取当前企业的基本信息', unsafe_allow_html=True)
     if st.button("获取企业信息", use_container_width=True, key="fetch_org"):
@@ -363,7 +359,7 @@ def main_page():
     st.markdown('</div>', unsafe_allow_html=True)
     
     # 项目列表卡片
-    st.markdown('<div style="background-color: #f8f9fa; border-radius: 6px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
+    st.markdown('<div style="border-radius: 6px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
     st.markdown('**项目列表**')
     st.markdown('获取企业下的所有项目', unsafe_allow_html=True)
     if st.button("获取项目列表", use_container_width=True, key="fetch_projects"):
@@ -373,7 +369,7 @@ def main_page():
     st.markdown('</div>', unsafe_allow_html=True)
     
     # 全部数据卡片
-    st.markdown('<div style="background-color: #e6f2ff; border-radius: 6px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 3px solid #007bff;">', unsafe_allow_html=True)
+    st.markdown('<div style="border-radius: 6px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 3px solid #007bff;">', unsafe_allow_html=True)
     st.markdown('**全部数据**')
     st.markdown('获取企业信息、项目和所有任务', unsafe_allow_html=True)
     if st.button("获取全部数据", use_container_width=True, type="primary", key="fetch_all"):
@@ -383,7 +379,7 @@ def main_page():
     st.markdown('</div>', unsafe_allow_html=True)
     
     # 工时信息卡片
-    st.markdown('<div style="background-color: #f8f9fa; border-radius: 6px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
+    st.markdown('<div style="border-radius: 6px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
     st.markdown('**工时信息**')
     st.markdown('获取任务的工时数据', unsafe_allow_html=True)
     if st.button("获取工时信息", use_container_width=True, key="fetch_worktime"):
