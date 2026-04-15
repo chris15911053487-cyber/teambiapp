@@ -118,10 +118,22 @@ class TeambitionAPI:
         return self._request("GET", "/org/info")
     
     def get_projects(self, page_size: int = 50):
-        """获取项目列表"""
-        result = self._request("GET", "/v3/project/query", 
-                              params={"pageSize": page_size})
-        return result.get("result", [])
+        """获取项目列表（支持分页）"""
+        all_projects = []
+        page = 1
+        
+        while True:
+            result = self._request("GET", "/v3/project/query", 
+                                  params={"pageSize": page_size, "page": page})
+            projects = result.get("result", [])
+            all_projects.extend(projects)
+            
+            # 检查是否还有更多数据
+            if len(projects) < page_size:
+                break
+            page += 1
+        
+        return all_projects
     
     def get_project_tasks(self, project_id: str, page_size: int = 50):
         """获取项目任务"""
@@ -343,61 +355,50 @@ def main_page():
     st.markdown("---")
     st.subheader("🚀 数据获取操作")
 
-    # 操作按钮 - 使用卡片式布局（2列布局更整洁）
-    col1, col2 = st.columns(2)
-
-    with col1:
-        # 第一行：企业信息和项目列表
-        subcol1, subcol2 = st.columns(2)
-        with subcol1:
-            card(
-                title="🏢 企业信息",
-                text="获取当前企业的基本信息",
-                image="",
-                url=""
-            )
-            if st.button("获取企业信息", use_container_width=True, key="fetch_org"):
-                fetch_org = True
-            else:
-                fetch_org = False
-
-        with subcol2:
-            card(
-                title="📁 项目列表",
-                text="获取企业下的所有项目",
-                image="",
-                url=""
-            )
-            if st.button("获取项目列表", use_container_width=True, key="fetch_projects"):
-                fetch_projects = True
-            else:
-                fetch_projects = False
-
-        # 第二行：全部数据和工时信息
-        subcol3, subcol4 = st.columns(2)
-        with subcol3:
-            card(
-                title="🚀 全部数据",
-                text="获取企业信息、项目和所有任务",
-                image="",
-                url=""
-            )
-            if st.button("获取全部数据", use_container_width=True, type="primary", key="fetch_all"):
-                fetch_all = True
-            else:
-                fetch_all = False
-
-        with subcol4:
-            card(
-                title="⏱️ 工时信息",
-                text="获取任务的工时数据",
-                image="",
-                url=""
-            )
-            if st.button("获取工时信息", use_container_width=True, key="fetch_worktime"):
-                fetch_worktime = True
-            else:
-                fetch_worktime = False
+    # 操作按钮 - 使用紧凑的网格布局
+    st.markdown('<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px;">', unsafe_allow_html=True)
+    
+    # 企业信息卡片
+    st.markdown('<div style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
+    st.markdown('### 🏢 企业信息')
+    st.markdown('获取当前企业的基本信息')
+    if st.button("获取企业信息", use_container_width=True, key="fetch_org"):
+        fetch_org = True
+    else:
+        fetch_org = False
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # 项目列表卡片
+    st.markdown('<div style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
+    st.markdown('### 📁 项目列表')
+    st.markdown('获取企业下的所有项目')
+    if st.button("获取项目列表", use_container_width=True, key="fetch_projects"):
+        fetch_projects = True
+    else:
+        fetch_projects = False
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # 全部数据卡片
+    st.markdown('<div style="background-color: #e6f2ff; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 4px solid #007bff;">', unsafe_allow_html=True)
+    st.markdown('### 🚀 全部数据')
+    st.markdown('获取企业信息、项目和所有任务')
+    if st.button("获取全部数据", use_container_width=True, type="primary", key="fetch_all"):
+        fetch_all = True
+    else:
+        fetch_all = False
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # 工时信息卡片
+    st.markdown('<div style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
+    st.markdown('### ⏱️ 工时信息')
+    st.markdown('获取任务的工时数据')
+    if st.button("获取工时信息", use_container_width=True, key="fetch_worktime"):
+        fetch_worktime = True
+    else:
+        fetch_worktime = False
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
     
     # 数据存储
     if 'org_data' not in st.session_state:
@@ -541,12 +542,12 @@ def display_data():
             # 转换为 DataFrame 显示
             projects_df = pd.DataFrame(st.session_state.projects_data)
             if not projects_df.empty:
-                display_cols = ['name', 'description', 'created', 'id']
+                display_cols = ['name', 'status', 'created', 'id']
                 available_cols = [c for c in display_cols if c in projects_df.columns]
                 st.dataframe(projects_df[available_cols], use_container_width=True,
                            column_config={
                                "name": st.column_config.TextColumn("项目名称", width="medium"),
-                               "description": st.column_config.TextColumn("描述", width="large"),
+                               "status": st.column_config.TextColumn("项目状态", width="small"),
                                "created": st.column_config.TextColumn("创建时间", width="medium"),
                                "id": st.column_config.TextColumn("项目ID", width="small")
                            })
@@ -663,6 +664,10 @@ def export_data():
             # 项目列表
             if st.session_state.projects_data:
                 projects_df = pd.DataFrame(st.session_state.projects_data)
+                # 只保留需要的字段
+                desired_cols = ['name', 'status', 'created', 'id']
+                available_cols = [c for c in desired_cols if c in projects_df.columns]
+                projects_df = projects_df[available_cols]
                 df_list.append(projects_df)
                 sheet_names.append("项目列表")
 
