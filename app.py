@@ -351,6 +351,12 @@ def main_page():
         st.session_state.confirm_projects_fetch = False
     if 'projects_estimated_pages' not in st.session_state:
         st.session_state.projects_estimated_pages = 0
+    if 'projects_data' not in st.session_state:
+        st.session_state.projects_data = None
+    if 'projects_analysis_ready' not in st.session_state:
+        st.session_state.projects_analysis_ready = False
+    if 'projects_analysis_api_response' not in st.session_state:
+        st.session_state.projects_analysis_api_response = None
 
     # 顶部标题栏
     st.markdown("""
@@ -431,6 +437,9 @@ def main_page():
         if st.button("📥 获取此接口", key="fetch_projects_card", use_container_width=True):
             st.session_state.show_projects_ui = True
             st.session_state.confirm_projects_fetch = False
+            st.session_state.projects_analysis_ready = False
+            st.session_state.projects_analysis_api_response = None
+            st.session_state.projects_estimated_pages = 0
         st.markdown("""
             </div>
         </div>
@@ -505,67 +514,69 @@ def main_page():
         if not st.session_state.confirm_projects_fetch:
             st.markdown("### 📊 分析预估")
             
-            # 先获取第一页来估算总页数
+            # 先获取第一页来估算总页数（结果写入 session_state；确认按钮必须在 if analyze_btn 之外渲染，否则点击确认时 analyze_btn 为 False，按钮不在树上，点击无效）
             col1, col2 = st.columns([1, 1])
             with col1:
-                analyze_btn = st.button("开始分析", type="primary", use_container_width=True)
+                analyze_btn = st.button("开始分析", type="primary", use_container_width=True, key="projects_start_analyze")
             
             if analyze_btn:
                 with st.spinner("分析中..."):
                     try:
-                        # 先获取第一页数据
                         first_page = client._request("GET", "/v3/project/query", params={"pageSize": 50, "page": 1})
-                        
-                        # 调试信息：显示完整响应
-                        with st.expander("🔍 查看API响应详情"):
-                            st.json(first_page)
-                        
-                        # 尝试不同的方式获取项目总数
-                        total = first_page.get("total", 0)
+                        total = first_page.get("total", 0) or 0
                         projects = first_page.get("result", [])
-                        
                         if total > 0:
                             estimated_pages = (total + 50 - 1) // 50
                         elif len(projects) > 0:
-                            # 如果没有total但有项目数据，先获取第一页看看有多少
-                            st.info(f"💡 API未返回总数，基于第一页数据预估...")
-                            total = len(projects)
                             estimated_pages = 10  # 默认预估10页
                         else:
-                            total = 0
                             estimated_pages = 1
-                        
                         st.session_state.projects_estimated_pages = estimated_pages
-                        
-                        st.success(f"✅ 分析完成！")
-                        st.markdown(f"""
-                        <div style="border: 1px solid #86efac; border-radius: 8px; padding: 15px; margin: 15px 0;">
-                            <h4 style="color: #166534; margin-top: 0; margin-bottom: 10px;">📋 预估信息</h4>
-                            <p style="margin: 5px 0;"><strong>第一页项目数：</strong>{len(projects)} 个</p>
-                            <p style="margin: 5px 0;"><strong>预估总页数：</strong>{estimated_pages} 页</p>
-                            <p style="margin: 5px 0;"><strong>每页数据量：</strong>50 个项目</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        
-                        col_confirm, col_cancel = st.columns([1, 1])
-                        with col_confirm:
-                            if st.button("✅ 确认开始获取", type="primary", use_container_width=True):
-                                st.session_state.confirm_projects_fetch = True
-                                st.rerun()
-                        with col_cancel:
-                            if st.button("❌ 取消", use_container_width=True):
-                                st.session_state.show_projects_ui = False
-                                st.rerun()
+                        st.session_state.projects_analysis_api_response = first_page
+                        st.session_state.projects_analysis_ready = True
+                        st.rerun()
                     except Exception as e:
                         st.error(f"❌ 分析失败: {e}")
                         with st.expander("🔍 查看错误详情"):
                             st.exception(e)
-                        if st.button("重试", use_container_width=True):
+                        if st.button("重试", key="projects_retry_analyze", use_container_width=True):
                             st.rerun()
-            else:
+            
+            if st.session_state.projects_analysis_ready and st.session_state.projects_analysis_api_response is not None:
+                first_page = st.session_state.projects_analysis_api_response
+                projects = first_page.get("result", [])
+                estimated_pages = st.session_state.projects_estimated_pages
+                total = first_page.get("total", 0) or 0
+                with st.expander("🔍 查看API响应详情"):
+                    st.json(first_page)
+                if not total and len(projects) > 0:
+                    st.info("💡 API未返回总数，基于第一页数据预估...")
+                st.success("✅ 分析完成！")
+                st.markdown(f"""
+                <div style="border: 1px solid #86efac; border-radius: 8px; padding: 15px; margin: 15px 0;">
+                    <h4 style="color: #166534; margin-top: 0; margin-bottom: 10px;">📋 预估信息</h4>
+                    <p style="margin: 5px 0;"><strong>第一页项目数：</strong>{len(projects)} 个</p>
+                    <p style="margin: 5px 0;"><strong>预估总页数：</strong>{estimated_pages} 页</p>
+                    <p style="margin: 5px 0;"><strong>每页数据量：</strong>50 个项目</p>
+                </div>
+                """, unsafe_allow_html=True)
+                col_confirm, col_cancel = st.columns([1, 1])
+                with col_confirm:
+                    if st.button("✅ 确认开始获取", type="primary", use_container_width=True, key="projects_confirm_fetch"):
+                        st.session_state.confirm_projects_fetch = True
+                        st.rerun()
+                with col_cancel:
+                    if st.button("❌ 取消", use_container_width=True, key="projects_cancel_analysis"):
+                        st.session_state.show_projects_ui = False
+                        st.session_state.projects_analysis_ready = False
+                        st.session_state.projects_analysis_api_response = None
+                        st.rerun()
+            elif not analyze_btn:
                 st.info("💡 点击\"开始分析\"按钮，系统会先获取第一页数据来预估需要调用的接口次数")
-                if st.button("返回主界面", use_container_width=True):
+                if st.button("返回主界面", use_container_width=True, key="projects_back_before_analyze"):
                     st.session_state.show_projects_ui = False
+                    st.session_state.projects_analysis_ready = False
+                    st.session_state.projects_analysis_api_response = None
                     st.rerun()
         
         if st.session_state.confirm_projects_fetch:
@@ -612,9 +623,11 @@ def main_page():
                         st.exception(e)
                     if st.button("重试", use_container_width=True):
                         st.rerun()
-                    if st.button("返回主界面", use_container_width=True):
+                    if st.button("返回主界面", key="projects_fetch_err_back", use_container_width=True):
                         st.session_state.show_projects_ui = False
                         st.session_state.confirm_projects_fetch = False
+                        st.session_state.projects_analysis_ready = False
+                        st.session_state.projects_analysis_api_response = None
                         st.rerun()
             else:
                 # 显示获取结果和分页表格
@@ -689,11 +702,13 @@ def main_page():
                     )
                 
                 # 返回按钮
-                if st.button("返回主界面", type="primary", use_container_width=True):
+                if st.button("返回主界面", type="primary", use_container_width=True, key="projects_done_back"):
                     st.session_state.show_projects_ui = False
                     st.session_state.confirm_projects_fetch = False
                     st.session_state.projects_page = 0
                     st.session_state.projects_data = None
+                    st.session_state.projects_analysis_ready = False
+                    st.session_state.projects_analysis_api_response = None
                     st.rerun()
     
     # 数据存储
