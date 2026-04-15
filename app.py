@@ -569,39 +569,56 @@ def main_page():
                     st.rerun()
         
         if st.session_state.confirm_projects_fetch:
-            st.markdown("### 🔄 获取进度")
-            
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            
-            try:
-                all_projects = []
-                page = 1
-                estimated_pages = st.session_state.projects_estimated_pages
+            # 检查是否已经有获取结果
+            if st.session_state.projects_data is None or len(st.session_state.projects_data) == 0:
+                st.markdown("### 🔄 获取进度")
                 
-                while True:
-                    status_text.text(f"正在获取第 {page} 页数据...")
-                    
-                    result = client._request("GET", "/v3/project/query", params={"pageSize": 50, "page": page})
-                    projects = result.get("result", [])
-                    all_projects.extend(projects)
-                    
-                    # 更新进度 - 使用更动态的方式
-                    if page <= estimated_pages:
-                        progress = min(page / estimated_pages, 0.95)
-                    else:
-                        progress = 0.95
-                    progress_bar.progress(progress)
-                    
-                    # 检查是否还有更多数据
-                    if len(projects) < 50:
-                        break
-                    page += 1
+                progress_bar = st.progress(0)
+                status_text = st.empty()
                 
-                st.session_state.projects_data = all_projects
-                progress_bar.progress(1.0)
-                status_text.text("✅ 获取完成！")
+                try:
+                    all_projects = []
+                    page = 1
+                    estimated_pages = st.session_state.projects_estimated_pages
+                    
+                    while True:
+                        status_text.text(f"正在获取第 {page} 页数据...")
+                        
+                        result = client._request("GET", "/v3/project/query", params={"pageSize": 50, "page": page})
+                        projects = result.get("result", [])
+                        all_projects.extend(projects)
+                        
+                        # 更新进度 - 使用更动态的方式
+                        if page <= estimated_pages:
+                            progress = min(page / estimated_pages, 0.95)
+                        else:
+                            progress = 0.95
+                        progress_bar.progress(progress)
+                        
+                        # 检查是否还有更多数据
+                        if len(projects) < 50:
+                            break
+                        page += 1
+                    
+                    st.session_state.projects_data = all_projects
+                    progress_bar.progress(1.0)
+                    status_text.text("✅ 获取完成！")
+                    st.success(f"✅ 成功获取 {len(all_projects)} 个项目！")
+                    st.rerun()  # 重新渲染以显示表格
                 
+                except Exception as e:
+                    st.error(f"❌ 获取失败: {e}")
+                    with st.expander("🔍 查看错误详情"):
+                        st.exception(e)
+                    if st.button("重试", use_container_width=True):
+                        st.rerun()
+                    if st.button("返回主界面", use_container_width=True):
+                        st.session_state.show_projects_ui = False
+                        st.session_state.confirm_projects_fetch = False
+                        st.rerun()
+            else:
+                # 显示获取结果和分页表格
+                all_projects = st.session_state.projects_data
                 st.success(f"✅ 成功获取 {len(all_projects)} 个项目！")
                 
                 # 分页表格显示
@@ -617,7 +634,7 @@ def main_page():
                 
                 with col_prev:
                     if st.session_state.projects_page > 0:
-                        if st.button("⬅️ 上一页", use_container_width=True):
+                        if st.button("⬅️ 上一页", key="prev_page", use_container_width=True):
                             st.session_state.projects_page -= 1
                             st.rerun()
                 
@@ -629,7 +646,7 @@ def main_page():
                 
                 with col_next:
                     if st.session_state.projects_page < total_pages - 1:
-                        if st.button("➡️ 下一页", use_container_width=True):
+                        if st.button("➡️ 下一页", key="next_page", use_container_width=True):
                             st.session_state.projects_page += 1
                             st.rerun()
                 
@@ -643,9 +660,9 @@ def main_page():
                 
                 # 提取主要列
                 project_data = []
-                for project in current_page_projects:
+                for idx, project in enumerate(current_page_projects):
                     project_data.append({
-                        '序号': start_idx + current_page_projects.index(project) + 1,
+                        '序号': start_idx + idx + 1,
                         '项目ID': project.get('id', ''),
                         '项目名称': project.get('name', '未命名'),
                         '项目状态': project.get('status', '未知'),
@@ -676,17 +693,7 @@ def main_page():
                     st.session_state.show_projects_ui = False
                     st.session_state.confirm_projects_fetch = False
                     st.session_state.projects_page = 0
-                    st.rerun()
-            
-            except Exception as e:
-                st.error(f"❌ 获取失败: {e}")
-                with st.expander("🔍 查看错误详情"):
-                    st.exception(e)
-                if st.button("重试", use_container_width=True):
-                    st.rerun()
-                if st.button("返回主界面", use_container_width=True):
-                    st.session_state.show_projects_ui = False
-                    st.session_state.confirm_projects_fetch = False
+                    st.session_state.projects_data = None
                     st.rerun()
     
     # 数据存储
