@@ -248,7 +248,8 @@ def config_page():
                 token = get_app_token(app_id, app_secret)
                 st.session_state['token'] = token
                 st.success("✅ Token 获取成功!")
-                st.info(f"Token: {token[:30]}...")
+                st.caption("以下为完整 Access Token，可全选复制：")
+                st.code(token, language=None)
             except Exception as e:
                 st.error(f"❌ 错误: {e}")
 

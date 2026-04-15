@@ -119,7 +119,8 @@ def sidebar():
                 token = get_app_token(app_id, app_secret)
                 st.session_state['token'] = token
                 st.sidebar.success("✅ Token 获取成功!")
-                st.sidebar.info(f"Token: {token[:30]}...")
+                st.sidebar.caption("完整 Access Token（可复制）：")
+                st.sidebar.code(token, language=None)
             except Exception as e:
                 st.sidebar.error(f"❌ 错误: {e}")
 
