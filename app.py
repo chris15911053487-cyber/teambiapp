@@ -338,57 +338,146 @@ def main_page():
         """)
         return
 
-    # 状态指示器
-    st.success("✅ API 配置完成，可以开始获取数据")
-
-    # 操作按钮区域
-    st.markdown("---")
-    st.subheader("数据获取操作")
-
-    # 操作按钮 - 使用紧凑的网格布局
-    st.markdown('<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 15px;">', unsafe_allow_html=True)
+    # 顶部标题栏
+    st.markdown("""
+    <div style="border-radius: 20px; padding: 25px 35px; margin-bottom: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+            <div>
+                <h1 style="color: #1e3a5f; margin: 0; font-size: 36px; font-weight: 700;">🔌 Teambition 数据工作台</h1>
+                <p style="color: #64748b; margin: 8px 0 0 0; font-size: 18px;">多源数据 · 统一视图 · 智能导出</p>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 顶部按钮
+    col_btn1, col_btn2 = st.columns([1, 1])
+    with col_btn1:
+        if st.button("☁️ 获取全部数据", use_container_width=True, type="primary"):
+            fetch_all = True
+    with col_btn2:
+        if st.button("📄 导出 Excel", use_container_width=True):
+            pass
+    
+    # 数据卡片网格布局
+    st.markdown("""
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 25px; margin-bottom: 30px;">
+    """, unsafe_allow_html=True)
     
     # 企业信息卡片
-    st.markdown('<div style="border-radius: 6px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
-    st.markdown('**企业信息**')
-    st.markdown('获取当前企业的基本信息', unsafe_allow_html=True)
-    if st.button("获取企业信息", use_container_width=True, key="fetch_org"):
-        fetch_org = True
-    else:
-        fetch_org = False
-    st.markdown('</div>', unsafe_allow_html=True)
+    col1, col2 = st.columns([1, 1])
     
-    # 项目列表卡片
-    st.markdown('<div style="border-radius: 6px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
-    st.markdown('**项目列表**')
-    st.markdown('获取企业下的所有项目', unsafe_allow_html=True)
-    if st.button("获取项目列表", use_container_width=True, key="fetch_projects"):
-        fetch_projects = True
-    else:
-        fetch_projects = False
-    st.markdown('</div>', unsafe_allow_html=True)
+    with col1:
+        st.markdown("""
+        <div style="border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden;">
+            <div style="padding: 20px 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 28px;">🏢</span>
+                    <h3 style="margin: 0; font-size: 22px; font-weight: 700; color: #1e293b;">企业信息</h3>
+                </div>
+                <span style="background-color: #e2e8f0; color: #475569; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600;">
+                    🕐 未获取
+                </span>
+            </div>
+            <div style="padding: 25px;">
+                <p style="color: #64748b; margin: 0 0 12px 0; font-size: 15px;">企业档案 / 基础信息</p>
+                <div style="border-radius: 8px; padding: 10px 15px; color: #94a3b8; font-size: 14px;">
+                    点击下方按钮获取数据
+                </div>
+            </div>
+            <div style="padding: 0 25px 25px 25px;">
+        """, unsafe_allow_html=True)
+        if st.button("📥 获取此接口", key="fetch_org_card", use_container_width=True):
+            fetch_org = True
+        st.markdown("""
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
     
-    # 全部数据卡片
-    st.markdown('<div style="border-radius: 6px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 3px solid #007bff;">', unsafe_allow_html=True)
-    st.markdown('**全部数据**')
-    st.markdown('获取企业信息、项目和所有任务', unsafe_allow_html=True)
-    if st.button("获取全部数据", use_container_width=True, type="primary", key="fetch_all"):
-        fetch_all = True
-    else:
-        fetch_all = False
-    st.markdown('</div>', unsafe_allow_html=True)
+    with col2:
+        st.markdown("""
+        <div style="border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden;">
+            <div style="padding: 20px 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 28px;">📂</span>
+                    <h3 style="margin: 0; font-size: 22px; font-weight: 700; color: #1e293b;">项目列表</h3>
+                </div>
+                <span style="background-color: #e2e8f0; color: #475569; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600;">
+                    🕐 未获取
+                </span>
+            </div>
+            <div style="padding: 25px;">
+                <p style="color: #64748b; margin: 0 0 12px 0; font-size: 15px;">项目目录 / 项目状态</p>
+                <div style="border-radius: 8px; padding: 10px 15px; color: #94a3b8; font-size: 14px;">
+                    点击下方按钮获取数据
+                </div>
+            </div>
+            <div style="padding: 0 25px 25px 25px;">
+        """, unsafe_allow_html=True)
+        if st.button("📥 获取此接口", key="fetch_projects_card", use_container_width=True):
+            fetch_projects = True
+        st.markdown("""
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
     
-    # 工时信息卡片
-    st.markdown('<div style="border-radius: 6px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
-    st.markdown('**工时信息**')
-    st.markdown('获取任务的工时数据', unsafe_allow_html=True)
-    if st.button("获取工时信息", use_container_width=True, key="fetch_worktime"):
-        fetch_worktime = True
-    else:
-        fetch_worktime = False
-    st.markdown('</div>', unsafe_allow_html=True)
+    col3, col4 = st.columns([1, 1])
     
-    st.markdown('</div>', unsafe_allow_html=True)
+    with col3:
+        st.markdown("""
+        <div style="border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden;">
+            <div style="padding: 20px 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 28px;">✅</span>
+                    <h3 style="margin: 0; font-size: 22px; font-weight: 700; color: #1e293b;">任务详情</h3>
+                </div>
+                <span style="background-color: #e2e8f0; color: #475569; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600;">
+                    🕐 未获取
+                </span>
+            </div>
+            <div style="padding: 25px;">
+                <p style="color: #64748b; margin: 0 0 12px 0; font-size: 15px;">任务清单 / 进度追踪</p>
+                <div style="border-radius: 8px; padding: 10px 15px; color: #94a3b8; font-size: 14px;">
+                    点击下方按钮获取数据
+                </div>
+            </div>
+            <div style="padding: 0 25px 25px 25px;">
+        """, unsafe_allow_html=True)
+        if st.button("📥 获取此接口", key="fetch_tasks_card", use_container_width=True):
+            fetch_all = True
+        st.markdown("""
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        st.markdown("""
+        <div style="border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden;">
+            <div style="padding: 20px 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 28px;">📊</span>
+                    <h3 style="margin: 0; font-size: 22px; font-weight: 700; color: #1e293b;">工时统计</h3>
+                </div>
+                <span style="background-color: #e2e8f0; color: #475569; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600;">
+                    🕐 未获取
+                </span>
+            </div>
+            <div style="padding: 25px;">
+                <p style="color: #64748b; margin: 0 0 12px 0; font-size: 15px;">工时记录 / 统计分析</p>
+                <div style="border-radius: 8px; padding: 10px 15px; color: #94a3b8; font-size: 14px;">
+                    点击下方按钮获取数据
+                </div>
+            </div>
+            <div style="padding: 0 25px 25px 25px;">
+        """, unsafe_allow_html=True)
+        if st.button("📥 获取此接口", key="fetch_worktime_card", use_container_width=True):
+            fetch_worktime = True
+        st.markdown("""
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("</div>", unsafe_allow_html=True)
     
     # 数据存储
     if 'org_data' not in st.session_state:
