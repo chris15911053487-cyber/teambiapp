@@ -8,8 +8,6 @@ Teambition API Web 应用
 import streamlit as st
 import pandas as pd
 import requests
-import json
-import os
 from datetime import datetime
 from io import BytesIO
 from dotenv import load_dotenv
@@ -23,56 +21,47 @@ load_dotenv()
 
 # 页面配置
 st.set_page_config(
-    page_title="Teambition API 工具",
+    page_title="Teambition 数据工作台",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
-        'Get Help': 'https://www.teambition.com',
+        'Get Help': 'https://open.teambition.com',
         'Report a bug': "https://github.com/your-repo/issues",
         'About': "# Teambition API Tool"
     }
 )
 
-# 自定义CSS样式
 st.markdown("""
 <style>
-    .main-header {
-        font-size: 2.5rem;
-        font-weight: bold;
-        color: #1f77b4;
-        text-align: center;
-        margin-bottom: 2rem;
+    .main-header { font-size: 2rem; font-weight: 700; color: #0f172a; margin-bottom: 0.35rem; }
+    .subtle { color: #64748b; font-size: 0.95rem; margin-bottom: 1.25rem; }
+    .hero {
+        background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 55%, #3b82f6 100%);
+        color: #fff;
+        border-radius: 14px;
+        padding: 1.35rem 1.5rem;
+        margin-bottom: 1.25rem;
+        box-shadow: 0 10px 30px rgba(37, 99, 235, 0.22);
+    }
+    .hero h1 { margin: 0; font-size: 1.65rem; font-weight: 700; letter-spacing: -0.02em; }
+    .hero p { margin: 0.45rem 0 0 0; opacity: 0.92; font-size: 0.98rem; }
+    .panel {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1rem 1.1rem;
+        background: #f8fafc;
+        margin-bottom: 0.75rem;
     }
     .card {
-        border-radius: 10px;
-        padding: 20px;
+        border-radius: 12px;
+        padding: 18px;
         margin: 10px 0;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
+        border: 1px solid #e2e8f0;
+        background: #fff;
     }
-    .metric-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-radius: 10px;
-        padding: 15px;
-        text-align: center;
-    }
-    .tab-button {
-        border: none;
-        border-radius: 5px;
-        padding: 10px 20px;
-        margin: 0 5px;
-        cursor: pointer;
-        transition: background-color 0.3s;
-    }
-    .tab-button.active {
-        background-color: #007bff;
-        color: white;
-    }
-    .sidebar-menu {
-        border-radius: 10px;
-        padding: 15px;
-    }
+    div[data-testid="stTabs"] button { font-weight: 600; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -216,45 +205,39 @@ def to_excel(df_list, sheet_names):
 
 
 def app_menu():
-    """应用顶部导航菜单"""
+    """侧边栏主导航"""
     with st.sidebar:
-        # 应用标题
-        st.markdown('<div style="text-align: center; margin-bottom: 20px;">', unsafe_allow_html=True)
-        st.markdown('<h3 style="color: #007bff; margin-bottom: 5px;">Teambition API 工具</h3>', unsafe_allow_html=True)
-        st.markdown('<p style="color: #666; font-size: 14px;">高效管理企业数据</p>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # 导航菜单
-        selected = option_menu(
-            menu_title="",  # 移除菜单标题，使界面更简洁
-            options=["首页", "数据", "配置", "关于"],
-            icons=["house", "bar-chart", "gear", "info-circle"],
-            menu_icon="cast",
-            default_index=0,
-            styles={
-                "container": {"padding": "10px", "border-radius": "10px"},
-                "icon": {"color": "#007bff", "font-size": "20px"},
-                "nav-link": {
-                    "font-size": "15px",
-                    "text-align": "left",
-                    "margin": "5px 0",
-                    "padding": "10px 15px",
-                },
-                "nav-link-selected": {"background-color": "#007bff", "color": "white"},
-            }
+        st.markdown(
+            "<div style='text-align:center;padding:0.25rem 0 0.75rem 0;'>"
+            "<div style='font-size:1.15rem;font-weight:700;color:#1e40af;'>Teambition</div>"
+            "<div style='color:#64748b;font-size:0.85rem;margin-top:2px;'>数据工作台</div></div>",
+            unsafe_allow_html=True,
         )
 
-        # 分隔线
-        st.markdown('---')
+        selected = option_menu(
+            menu_title="导航",
+            options=["工作台", "数据", "配置", "关于"],
+            icons=["house", "bar-chart", "gear", "info-circle"],
+            menu_icon="window-sidebar",
+            default_index=0,
+            styles={
+                "container": {"padding": "6px 4px", "border-radius": "12px", "background-color": "#f1f5f9"},
+                "icon": {"color": "#2563eb", "font-size": "18px"},
+                "nav-link": {
+                    "font-size": "14px",
+                    "text-align": "left",
+                    "margin": "4px 0",
+                    "padding": "10px 14px",
+                },
+                "nav-link-selected": {"background-color": "#2563eb", "color": "white"},
+            },
+        )
 
-        # 状态信息
-        st.markdown('<h4 style="color: #333; margin-bottom: 10px;">当前状态</h4>', unsafe_allow_html=True)
-        
-        has_token = "✅" if st.session_state.get('token') else "❌"
-        has_tenant = "✅" if st.session_state.get('tenant_id') else "❌"
-        
-        st.markdown(f"- Token: {has_token}")
-        st.markdown(f"- 企业ID: {has_tenant}")
+        st.markdown("---")
+        st.caption("连接状态")
+        has_token = "已配置" if st.session_state.get("token") else "未配置"
+        has_tenant = "已填写" if st.session_state.get("tenant_id") else "未填写"
+        st.markdown(f"**Token**：{has_token}  \n**企业 ID**：{has_tenant}")
 
     return selected
 
@@ -357,437 +340,334 @@ def about_page():
 
 
 def main_page():
-    """主页面"""
+    """数据主页面：操作、项目拉取、展示与导出分区"""
 
+    st.info("**使用提示**：请先在侧边栏选择「配置」，输入当日暗号并获取 Token。")
 
-    # 欢迎信息和说明
-    st.info("💡 **使用提示**: 请先在侧边栏菜单中选择“配置”页面，然后输入 API 凭证并获取 Token。")
-
-    # 检查配置
     client = get_api_client()
     if not client:
-        st.warning("⚠️ 请在侧边栏菜单中选择“配置”页面并完成 Token / 企业 ID 设置")
-        st.markdown("""
-        ### 配置步骤:
-        1. 输入您的 App ID 和 App Secret
-        2. 点击"获取 Token"按钮
-        3. 或者直接输入已有的 Access Token
-        4. 输入企业 ID (Tenant ID)
-        """)
+        st.warning("⚠️ 请先在「配置」中完成 Token 与企业 ID（已内置默认值）。")
+        st.markdown(
+            """
+            **配置步骤**
+            1. 打开「配置」页面  
+            2. 输入当日暗号（格式 `YYYYMMDD`）并获取 Token  
+            3. 返回本页开始拉取数据  
+            """
+        )
         return
-    
-    # 初始化所有获取标志
+
     fetch_org = False
     fetch_projects = False
     fetch_all = False
     fetch_worktime = False
-    
-    # 初始化项目清单获取界面状态
-    if 'show_projects_ui' not in st.session_state:
+
+    if "show_projects_ui" not in st.session_state:
         st.session_state.show_projects_ui = False
-    if 'confirm_projects_fetch' not in st.session_state:
+    if "confirm_projects_fetch" not in st.session_state:
         st.session_state.confirm_projects_fetch = False
-    if 'projects_estimated_pages' not in st.session_state:
+    if "projects_estimated_pages" not in st.session_state:
         st.session_state.projects_estimated_pages = 0
-    if 'projects_data' not in st.session_state:
+    if "projects_data" not in st.session_state:
         st.session_state.projects_data = None
-    if 'projects_analysis_ready' not in st.session_state:
+    if "projects_analysis_ready" not in st.session_state:
         st.session_state.projects_analysis_ready = False
-    if 'projects_analysis_api_response' not in st.session_state:
+    if "projects_analysis_api_response" not in st.session_state:
         st.session_state.projects_analysis_api_response = None
 
-    # 顶部标题栏
-    st.markdown("""
-    <div style="border-radius: 20px; padding: 25px 35px; margin-bottom: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
-            <div>
-                <h1 style="color: #1e3a5f; margin: 0; font-size: 36px; font-weight: 700;">🔌 Teambition 数据工作台</h1>
-                <p style="color: #64748b; margin: 8px 0 0 0; font-size: 18px;">多源数据 · 统一视图 · 智能导出</p>
-            </div>
+    st.markdown(
+        """
+        <div class="hero">
+            <h1>Teambition 数据工作台</h1>
+            <p>企业 · 项目 · 任务 · 工时 · Excel 导出</p>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True,
+    )
+
+    tab_ops, tab_data, tab_export = st.tabs(["操作面板", "数据展示", "导出 Excel"])
+
+    with tab_ops:
+        st.markdown('<p class="subtle">先拉取企业/项目，再拉任务；「获取全部数据」会依次拉取企业、全部项目、全部任务与工时。</p>', unsafe_allow_html=True)
+        b1, b2 = st.columns(2)
+        with b1:
+            if st.button("获取全部数据", use_container_width=True, type="primary"):
+                fetch_all = True
+        with b2:
+            st.caption("导出请切换到「导出 Excel」标签页。")
+
+        st.markdown("#### 分步获取")
+        r1c1, r1c2 = st.columns(2)
+        with r1c1:
+            st.markdown('<div class="panel"><strong>企业信息</strong><br/><span style="color:#64748b;font-size:0.9rem;">企业档案与基础字段</span></div>', unsafe_allow_html=True)
+            if st.button("拉取企业信息", key="fetch_org_card", use_container_width=True):
+                fetch_org = True
+        with r1c2:
+            st.markdown('<div class="panel"><strong>项目列表</strong><br/><span style="color:#64748b;font-size:0.9rem;">游标分页，可先预估再整表拉取</span></div>', unsafe_allow_html=True)
+            if st.button("项目清单向导", key="fetch_projects_card", use_container_width=True):
+                st.session_state.show_projects_ui = True
+                st.session_state.confirm_projects_fetch = False
+                st.session_state.projects_analysis_ready = False
+                st.session_state.projects_analysis_api_response = None
+                st.session_state.projects_estimated_pages = 0
+
+        r2c1, r2c2 = st.columns(2)
+        with r2c1:
+            st.markdown('<div class="panel"><strong>任务详情</strong><br/><span style="color:#64748b;font-size:0.9rem;">需先有项目列表，再按项目拉任务</span></div>', unsafe_allow_html=True)
+            if st.button("拉取全部项目任务", key="fetch_tasks_card", use_container_width=True):
+                fetch_all = True
+        with r2c2:
+            st.markdown('<div class="panel"><strong>工时统计</strong><br/><span style="color:#64748b;font-size:0.9rem;">依赖已拉取的任务数据</span></div>', unsafe_allow_html=True)
+            if st.button("拉取工时", key="fetch_worktime_card", use_container_width=True):
+                fetch_worktime = True
     
-    # 顶部按钮
-    col_btn1, col_btn2 = st.columns([1, 1])
-    with col_btn1:
-        if st.button("☁️ 获取全部数据", use_container_width=True, type="primary"):
-            fetch_all = True
-    with col_btn2:
-        if st.button("📄 导出 Excel", use_container_width=True):
-            pass
-    
-    # 数据卡片网格布局
-    st.markdown("""
-    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 25px; margin-bottom: 30px;">
-    """, unsafe_allow_html=True)
-    
-    # 企业信息卡片
-    col1, col2 = st.columns([1, 1])
-    
-    with col1:
-        st.markdown("""
-        <div style="border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden;">
-            <div style="padding: 20px 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 28px;">🏢</span>
-                    <h3 style="margin: 0; font-size: 22px; font-weight: 700; color: #1e293b;">企业信息</h3>
-                </div>
-                <span style="background-color: #e2e8f0; color: #475569; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600;">
-                    🕐 未获取
-                </span>
+        # 项目清单获取专门界面
+        if st.session_state.show_projects_ui:
+            st.markdown("""
+            <div style="border-radius: 16px; padding: 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-bottom: 30px;">
+                <h2 style="color: #1e293b; margin-top: 0; margin-bottom: 20px;">📂 项目清单获取</h2>
             </div>
-            <div style="padding: 25px;">
-                <p style="color: #64748b; margin: 0 0 12px 0; font-size: 15px;">企业档案 / 基础信息</p>
-                <div style="border-radius: 8px; padding: 10px 15px; color: #94a3b8; font-size: 14px;">
-                    点击下方按钮获取数据
-                </div>
-            </div>
-            <div style="padding: 0 25px 25px 25px;">
-        """, unsafe_allow_html=True)
-        if st.button("📥 获取此接口", key="fetch_org_card", use_container_width=True):
-            fetch_org = True
-        st.markdown("""
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div style="border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden;">
-            <div style="padding: 20px 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 28px;">📂</span>
-                    <h3 style="margin: 0; font-size: 22px; font-weight: 700; color: #1e293b;">项目列表</h3>
-                </div>
-                <span style="background-color: #e2e8f0; color: #475569; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600;">
-                    🕐 未获取
-                </span>
-            </div>
-            <div style="padding: 25px;">
-                <p style="color: #64748b; margin: 0 0 12px 0; font-size: 15px;">项目目录 / 项目状态</p>
-                <div style="border-radius: 8px; padding: 10px 15px; color: #94a3b8; font-size: 14px;">
-                    点击下方按钮获取数据
-                </div>
-            </div>
-            <div style="padding: 0 25px 25px 25px;">
-        """, unsafe_allow_html=True)
-        if st.button("📥 获取此接口", key="fetch_projects_card", use_container_width=True):
-            st.session_state.show_projects_ui = True
-            st.session_state.confirm_projects_fetch = False
-            st.session_state.projects_analysis_ready = False
-            st.session_state.projects_analysis_api_response = None
-            st.session_state.projects_estimated_pages = 0
-        st.markdown("""
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    col3, col4 = st.columns([1, 1])
-    
-    with col3:
-        st.markdown("""
-        <div style="border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden;">
-            <div style="padding: 20px 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 28px;">✅</span>
-                    <h3 style="margin: 0; font-size: 22px; font-weight: 700; color: #1e293b;">任务详情</h3>
-                </div>
-                <span style="background-color: #e2e8f0; color: #475569; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600;">
-                    🕐 未获取
-                </span>
-            </div>
-            <div style="padding: 25px;">
-                <p style="color: #64748b; margin: 0 0 12px 0; font-size: 15px;">任务清单 / 进度追踪</p>
-                <div style="border-radius: 8px; padding: 10px 15px; color: #94a3b8; font-size: 14px;">
-                    点击下方按钮获取数据
-                </div>
-            </div>
-            <div style="padding: 0 25px 25px 25px;">
-        """, unsafe_allow_html=True)
-        if st.button("📥 获取此接口", key="fetch_tasks_card", use_container_width=True):
-            fetch_all = True
-        st.markdown("""
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col4:
-        st.markdown("""
-        <div style="border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden;">
-            <div style="padding: 20px 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 28px;">📊</span>
-                    <h3 style="margin: 0; font-size: 22px; font-weight: 700; color: #1e293b;">工时统计</h3>
-                </div>
-                <span style="background-color: #e2e8f0; color: #475569; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600;">
-                    🕐 未获取
-                </span>
-            </div>
-            <div style="padding: 25px;">
-                <p style="color: #64748b; margin: 0 0 12px 0; font-size: 15px;">工时记录 / 统计分析</p>
-                <div style="border-radius: 8px; padding: 10px 15px; color: #94a3b8; font-size: 14px;">
-                    点击下方按钮获取数据
-                </div>
-            </div>
-            <div style="padding: 0 25px 25px 25px;">
-        """, unsafe_allow_html=True)
-        if st.button("📥 获取此接口", key="fetch_worktime_card", use_container_width=True):
-            fetch_worktime = True
-        st.markdown("""
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    # 项目清单获取专门界面
-    if st.session_state.show_projects_ui:
-        st.markdown("""
-        <div style="border-radius: 16px; padding: 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-bottom: 30px;">
-            <h2 style="color: #1e293b; margin-top: 0; margin-bottom: 20px;">📂 项目清单获取</h2>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if not st.session_state.confirm_projects_fetch:
-            st.markdown("### 📊 分析预估")
+            """, unsafe_allow_html=True)
             
-            # 先获取第一页来估算总页数（结果写入 session_state；确认按钮必须在 if analyze_btn 之外渲染，否则点击确认时 analyze_btn 为 False，按钮不在树上，点击无效）
-            col1, col2 = st.columns([1, 1])
-            with col1:
-                analyze_btn = st.button("开始分析", type="primary", use_container_width=True, key="projects_start_analyze")
-            
-            if analyze_btn:
-                with st.spinner("分析中..."):
-                    try:
-                        first_page = client.query_projects_page(50, None)
-                        total = (
-                            first_page.get("total")
-                            or first_page.get("totalSize")
-                            or first_page.get("total_size")
-                            or 0
+            if not st.session_state.confirm_projects_fetch:
+                st.markdown("### 📊 分析预估")
+                
+                # 先获取第一页来估算总页数（结果写入 session_state；确认按钮必须在 if analyze_btn 之外渲染，否则点击确认时 analyze_btn 为 False，按钮不在树上，点击无效）
+                col1, col2 = st.columns([1, 1])
+                with col1:
+                    analyze_btn = st.button("开始分析", type="primary", use_container_width=True, key="projects_start_analyze")
+                
+                if analyze_btn:
+                    with st.spinner("分析中..."):
+                        try:
+                            first_page = client.query_projects_page(50, None)
+                            total = (
+                                first_page.get("total")
+                                or first_page.get("totalSize")
+                                or first_page.get("total_size")
+                                or 0
+                            )
+                            if total:
+                                total = int(total)
+                            projects = first_page.get("result", [])
+                            if total > 0:
+                                estimated_pages = (total + 50 - 1) // 50
+                            elif len(projects) > 0:
+                                # 接口未给 total 时无法预估总页数；旧版写死 10 页会误导（实际可能上百页）
+                                estimated_pages = None
+                            else:
+                                estimated_pages = 1
+                            st.session_state.projects_estimated_pages = estimated_pages
+                            st.session_state.projects_analysis_api_response = first_page
+                            st.session_state.projects_analysis_ready = True
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ 分析失败: {e}")
+                            with st.expander("🔍 查看错误详情"):
+                                st.exception(e)
+                            if st.button("重试", key="projects_retry_analyze", use_container_width=True):
+                                st.rerun()
+                
+                if st.session_state.projects_analysis_ready and st.session_state.projects_analysis_api_response is not None:
+                    first_page = st.session_state.projects_analysis_api_response
+                    projects = first_page.get("result", [])
+                    estimated_pages = st.session_state.projects_estimated_pages
+                    total = (
+                        first_page.get("total")
+                        or first_page.get("totalSize")
+                        or first_page.get("total_size")
+                        or 0
+                    )
+                    if total:
+                        total = int(total)
+                    with st.expander("🔍 查看API响应详情"):
+                        st.json(first_page)
+                    if not total and len(projects) > 0:
+                        st.info(
+                            "💡 **API 未返回总条数**时无法预估批次数；项目列表使用 **nextPageToken 游标**翻页，"
+                            "直至响应中无下一页令牌为止（与「每页是否满 50 条」无必然关系）。"
                         )
-                        if total:
-                            total = int(total)
-                        projects = first_page.get("result", [])
-                        if total > 0:
-                            estimated_pages = (total + 50 - 1) // 50
-                        elif len(projects) > 0:
-                            # 接口未给 total 时无法预估总页数；旧版写死 10 页会误导（实际可能上百页）
-                            estimated_pages = None
-                        else:
-                            estimated_pages = 1
-                        st.session_state.projects_estimated_pages = estimated_pages
-                        st.session_state.projects_analysis_api_response = first_page
-                        st.session_state.projects_analysis_ready = True
+                    st.success("✅ 分析完成！")
+                    pages_line = (
+                        f"<p style=\"margin: 5px 0;\"><strong>预估总页数：</strong>{estimated_pages} 页</p>"
+                        if estimated_pages is not None
+                        else (
+                            "<p style=\"margin: 5px 0;\"><strong>预估总页数：</strong>未知（接口未返回总数；"
+                            "将按游标拉取直至无 nextPageToken）</p>"
+                        )
+                    )
+                    st.markdown(f"""
+                    <div style="border: 1px solid #86efac; border-radius: 8px; padding: 15px; margin: 15px 0;">
+                        <h4 style="color: #166534; margin-top: 0; margin-bottom: 10px;">📋 预估信息</h4>
+                        <p style="margin: 5px 0;"><strong>第一页项目数：</strong>{len(projects)} 个</p>
+                        {pages_line}
+                        <p style="margin: 5px 0;"><strong>每页数据量：</strong>50 个项目</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    col_confirm, col_cancel = st.columns([1, 1])
+                    with col_confirm:
+                        if st.button("✅ 确认开始获取", type="primary", use_container_width=True, key="projects_confirm_fetch"):
+                            st.session_state.confirm_projects_fetch = True
+                            st.rerun()
+                    with col_cancel:
+                        if st.button("❌ 取消", use_container_width=True, key="projects_cancel_analysis"):
+                            st.session_state.show_projects_ui = False
+                            st.session_state.projects_analysis_ready = False
+                            st.session_state.projects_analysis_api_response = None
+                            st.rerun()
+                elif not analyze_btn:
+                    st.info("💡 点击\"开始分析\"按钮，系统会先获取第一页数据来预估需要调用的接口次数")
+                    if st.button("返回主界面", use_container_width=True, key="projects_back_before_analyze"):
+                        st.session_state.show_projects_ui = False
+                        st.session_state.projects_analysis_ready = False
+                        st.session_state.projects_analysis_api_response = None
                         st.rerun()
+            
+            if st.session_state.confirm_projects_fetch:
+                # 检查是否已经有获取结果
+                if st.session_state.projects_data is None or len(st.session_state.projects_data) == 0:
+                    st.markdown("### 🔄 获取进度")
+                    
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+                    
+                    try:
+                        all_projects = []
+                        page_token = None
+                        batch = 0
+                        estimated_pages = st.session_state.projects_estimated_pages
+                        prev_first_id = None
+    
+                        while True:
+                            batch += 1
+                            if estimated_pages:
+                                status_text.text(f"正在获取第 {batch} / 约 {estimated_pages} 批（游标分页）…")
+                            else:
+                                status_text.text(f"正在获取第 {batch} 批（游标分页，无 nextPageToken 即结束）…")
+    
+                            result = client.query_projects_page(50, page_token)
+                            projects = result.get("result") or []
+                            if projects:
+                                first_id = projects[0].get("id")
+                                if prev_first_id is not None and first_id == prev_first_id:
+                                    raise RuntimeError(
+                                        "分页异常：连续两批首条项目相同，疑似未正确使用游标翻页。"
+                                        "若曾出现数百「页」而实际项目仅数百个，多为旧版误用 page 参数导致重复拉取。"
+                                    )
+                                prev_first_id = first_id
+    
+                            all_projects.extend(projects)
+    
+                            if estimated_pages and estimated_pages > 0:
+                                progress = min(batch / estimated_pages, 0.95)
+                            else:
+                                progress = min(0.95, batch / (batch + 1))
+                            progress_bar.progress(progress)
+    
+                            page_token = TeambitionAPI.project_query_next_token(result)
+                            if not page_token:
+                                break
+                        
+                        st.session_state.projects_data = all_projects
+                        progress_bar.progress(1.0)
+                        status_text.text("✅ 获取完成！")
+                        st.success(f"✅ 成功获取 {len(all_projects)} 个项目！")
+                        st.rerun()  # 重新渲染以显示表格
+                    
                     except Exception as e:
-                        st.error(f"❌ 分析失败: {e}")
+                        st.error(f"❌ 获取失败: {e}")
                         with st.expander("🔍 查看错误详情"):
                             st.exception(e)
-                        if st.button("重试", key="projects_retry_analyze", use_container_width=True):
+                        if st.button("重试", use_container_width=True):
                             st.rerun()
-            
-            if st.session_state.projects_analysis_ready and st.session_state.projects_analysis_api_response is not None:
-                first_page = st.session_state.projects_analysis_api_response
-                projects = first_page.get("result", [])
-                estimated_pages = st.session_state.projects_estimated_pages
-                total = (
-                    first_page.get("total")
-                    or first_page.get("totalSize")
-                    or first_page.get("total_size")
-                    or 0
-                )
-                if total:
-                    total = int(total)
-                with st.expander("🔍 查看API响应详情"):
-                    st.json(first_page)
-                if not total and len(projects) > 0:
-                    st.info(
-                        "💡 **API 未返回总条数**时无法预估批次数；项目列表使用 **nextPageToken 游标**翻页，"
-                        "直至响应中无下一页令牌为止（与「每页是否满 50 条」无必然关系）。"
-                    )
-                st.success("✅ 分析完成！")
-                pages_line = (
-                    f"<p style=\"margin: 5px 0;\"><strong>预估总页数：</strong>{estimated_pages} 页</p>"
-                    if estimated_pages is not None
-                    else (
-                        "<p style=\"margin: 5px 0;\"><strong>预估总页数：</strong>未知（接口未返回总数；"
-                        "将按游标拉取直至无 nextPageToken）</p>"
-                    )
-                )
-                st.markdown(f"""
-                <div style="border: 1px solid #86efac; border-radius: 8px; padding: 15px; margin: 15px 0;">
-                    <h4 style="color: #166534; margin-top: 0; margin-bottom: 10px;">📋 预估信息</h4>
-                    <p style="margin: 5px 0;"><strong>第一页项目数：</strong>{len(projects)} 个</p>
-                    {pages_line}
-                    <p style="margin: 5px 0;"><strong>每页数据量：</strong>50 个项目</p>
-                </div>
-                """, unsafe_allow_html=True)
-                col_confirm, col_cancel = st.columns([1, 1])
-                with col_confirm:
-                    if st.button("✅ 确认开始获取", type="primary", use_container_width=True, key="projects_confirm_fetch"):
-                        st.session_state.confirm_projects_fetch = True
-                        st.rerun()
-                with col_cancel:
-                    if st.button("❌ 取消", use_container_width=True, key="projects_cancel_analysis"):
-                        st.session_state.show_projects_ui = False
-                        st.session_state.projects_analysis_ready = False
-                        st.session_state.projects_analysis_api_response = None
-                        st.rerun()
-            elif not analyze_btn:
-                st.info("💡 点击\"开始分析\"按钮，系统会先获取第一页数据来预估需要调用的接口次数")
-                if st.button("返回主界面", use_container_width=True, key="projects_back_before_analyze"):
-                    st.session_state.show_projects_ui = False
-                    st.session_state.projects_analysis_ready = False
-                    st.session_state.projects_analysis_api_response = None
-                    st.rerun()
-        
-        if st.session_state.confirm_projects_fetch:
-            # 检查是否已经有获取结果
-            if st.session_state.projects_data is None or len(st.session_state.projects_data) == 0:
-                st.markdown("### 🔄 获取进度")
-                
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-                
-                try:
-                    all_projects = []
-                    page_token = None
-                    batch = 0
-                    estimated_pages = st.session_state.projects_estimated_pages
-                    prev_first_id = None
-
-                    while True:
-                        batch += 1
-                        if estimated_pages:
-                            status_text.text(f"正在获取第 {batch} / 约 {estimated_pages} 批（游标分页）…")
-                        else:
-                            status_text.text(f"正在获取第 {batch} 批（游标分页，无 nextPageToken 即结束）…")
-
-                        result = client.query_projects_page(50, page_token)
-                        projects = result.get("result") or []
-                        if projects:
-                            first_id = projects[0].get("id")
-                            if prev_first_id is not None and first_id == prev_first_id:
-                                raise RuntimeError(
-                                    "分页异常：连续两批首条项目相同，疑似未正确使用游标翻页。"
-                                    "若曾出现数百「页」而实际项目仅数百个，多为旧版误用 page 参数导致重复拉取。"
-                                )
-                            prev_first_id = first_id
-
-                        all_projects.extend(projects)
-
-                        if estimated_pages and estimated_pages > 0:
-                            progress = min(batch / estimated_pages, 0.95)
-                        else:
-                            progress = min(0.95, batch / (batch + 1))
-                        progress_bar.progress(progress)
-
-                        page_token = TeambitionAPI.project_query_next_token(result)
-                        if not page_token:
-                            break
-                    
-                    st.session_state.projects_data = all_projects
-                    progress_bar.progress(1.0)
-                    status_text.text("✅ 获取完成！")
+                        if st.button("返回主界面", key="projects_fetch_err_back", use_container_width=True):
+                            st.session_state.show_projects_ui = False
+                            st.session_state.confirm_projects_fetch = False
+                            st.session_state.projects_analysis_ready = False
+                            st.session_state.projects_analysis_api_response = None
+                            st.rerun()
+                else:
+                    # 显示获取结果和分页表格
+                    all_projects = st.session_state.projects_data
                     st.success(f"✅ 成功获取 {len(all_projects)} 个项目！")
-                    st.rerun()  # 重新渲染以显示表格
-                
-                except Exception as e:
-                    st.error(f"❌ 获取失败: {e}")
-                    with st.expander("🔍 查看错误详情"):
-                        st.exception(e)
-                    if st.button("重试", use_container_width=True):
-                        st.rerun()
-                    if st.button("返回主界面", key="projects_fetch_err_back", use_container_width=True):
+                    
+                    # 分页表格显示
+                    st.markdown("### 📊 项目列表（分页显示）")
+                    
+                    # 初始化分页状态
+                    if 'projects_page' not in st.session_state:
+                        st.session_state.projects_page = 0
+                    
+                    # 分页控制
+                    total_pages = (len(all_projects) + 49) // 50
+                    col_prev, col_info, col_next = st.columns([1, 2, 1])
+                    
+                    with col_prev:
+                        if st.session_state.projects_page > 0:
+                            if st.button("⬅️ 上一页", key="prev_page", use_container_width=True):
+                                st.session_state.projects_page -= 1
+                                st.rerun()
+                    
+                    with col_info:
+                        st.markdown(f"""<div style='text-align: center; color: #64748b;'>
+                            <strong>第 {st.session_state.projects_page + 1} 页 / 共 {total_pages} 页</strong><br>
+                            <small>每页显示 50 个项目，共 {len(all_projects)} 个项目</small>
+                        </div>""", unsafe_allow_html=True)
+                    
+                    with col_next:
+                        if st.session_state.projects_page < total_pages - 1:
+                            if st.button("➡️ 下一页", key="next_page", use_container_width=True):
+                                st.session_state.projects_page += 1
+                                st.rerun()
+                    
+                    # 显示当前页的数据
+                    start_idx = st.session_state.projects_page * 50
+                    end_idx = min(start_idx + 50, len(all_projects))
+                    current_page_projects = all_projects[start_idx:end_idx]
+                    
+                    # 转换为DataFrame并显示主要列
+                    import pandas as pd
+                    
+                    # 提取主要列
+                    project_data = []
+                    for idx, project in enumerate(current_page_projects):
+                        project_data.append({
+                            '序号': start_idx + idx + 1,
+                            '项目ID': project.get('id', ''),
+                            '项目名称': project.get('name', '未命名'),
+                            '项目状态': project.get('status', '未知'),
+                            '创建时间': project.get('created', ''),
+                            '负责人': project.get('ownerId', '')
+                        })
+                    
+                    if project_data:
+                        df = pd.DataFrame(project_data)
+                        
+                        # 设置表格样式
+                        st.dataframe(
+                            df,
+                            use_container_width=True,
+                            hide_index=True,
+                            column_config={
+                                '序号': st.column_config.NumberColumn(width='small'),
+                                '项目ID': st.column_config.TextColumn(width='medium'),
+                                '项目名称': st.column_config.TextColumn(width='large'),
+                                '项目状态': st.column_config.TextColumn(width='small'),
+                                '创建时间': st.column_config.TextColumn(width='medium'),
+                                '负责人': st.column_config.TextColumn(width='medium')
+                            }
+                        )
+                    
+                    # 返回按钮
+                    if st.button("返回主界面", type="primary", use_container_width=True, key="projects_done_back"):
                         st.session_state.show_projects_ui = False
                         st.session_state.confirm_projects_fetch = False
+                        st.session_state.projects_page = 0
+                        st.session_state.projects_data = None
                         st.session_state.projects_analysis_ready = False
                         st.session_state.projects_analysis_api_response = None
                         st.rerun()
-            else:
-                # 显示获取结果和分页表格
-                all_projects = st.session_state.projects_data
-                st.success(f"✅ 成功获取 {len(all_projects)} 个项目！")
-                
-                # 分页表格显示
-                st.markdown("### 📊 项目列表（分页显示）")
-                
-                # 初始化分页状态
-                if 'projects_page' not in st.session_state:
-                    st.session_state.projects_page = 0
-                
-                # 分页控制
-                total_pages = (len(all_projects) + 49) // 50
-                col_prev, col_info, col_next = st.columns([1, 2, 1])
-                
-                with col_prev:
-                    if st.session_state.projects_page > 0:
-                        if st.button("⬅️ 上一页", key="prev_page", use_container_width=True):
-                            st.session_state.projects_page -= 1
-                            st.rerun()
-                
-                with col_info:
-                    st.markdown(f"""<div style='text-align: center; color: #64748b;'>
-                        <strong>第 {st.session_state.projects_page + 1} 页 / 共 {total_pages} 页</strong><br>
-                        <small>每页显示 50 个项目，共 {len(all_projects)} 个项目</small>
-                    </div>""", unsafe_allow_html=True)
-                
-                with col_next:
-                    if st.session_state.projects_page < total_pages - 1:
-                        if st.button("➡️ 下一页", key="next_page", use_container_width=True):
-                            st.session_state.projects_page += 1
-                            st.rerun()
-                
-                # 显示当前页的数据
-                start_idx = st.session_state.projects_page * 50
-                end_idx = min(start_idx + 50, len(all_projects))
-                current_page_projects = all_projects[start_idx:end_idx]
-                
-                # 转换为DataFrame并显示主要列
-                import pandas as pd
-                
-                # 提取主要列
-                project_data = []
-                for idx, project in enumerate(current_page_projects):
-                    project_data.append({
-                        '序号': start_idx + idx + 1,
-                        '项目ID': project.get('id', ''),
-                        '项目名称': project.get('name', '未命名'),
-                        '项目状态': project.get('status', '未知'),
-                        '创建时间': project.get('created', ''),
-                        '负责人': project.get('ownerId', '')
-                    })
-                
-                if project_data:
-                    df = pd.DataFrame(project_data)
-                    
-                    # 设置表格样式
-                    st.dataframe(
-                        df,
-                        use_container_width=True,
-                        hide_index=True,
-                        column_config={
-                            '序号': st.column_config.NumberColumn(width='small'),
-                            '项目ID': st.column_config.TextColumn(width='medium'),
-                            '项目名称': st.column_config.TextColumn(width='large'),
-                            '项目状态': st.column_config.TextColumn(width='small'),
-                            '创建时间': st.column_config.TextColumn(width='medium'),
-                            '负责人': st.column_config.TextColumn(width='medium')
-                        }
-                    )
-                
-                # 返回按钮
-                if st.button("返回主界面", type="primary", use_container_width=True, key="projects_done_back"):
-                    st.session_state.show_projects_ui = False
-                    st.session_state.confirm_projects_fetch = False
-                    st.session_state.projects_page = 0
-                    st.session_state.projects_data = None
-                    st.session_state.projects_analysis_ready = False
-                    st.session_state.projects_analysis_api_response = None
-                    st.rerun()
-    
+        
     # 数据存储
     if 'org_data' not in st.session_state:
         st.session_state.org_data = None
@@ -880,11 +760,10 @@ def main_page():
         else:
             st.warning("⚠️ 请先获取任务数据，再获取工时信息")
     
-    # 显示数据
-    display_data()
-    
-    # 导出功能
-    export_data()
+    with tab_data:
+        display_data()
+    with tab_export:
+        export_data()
 
 
 def display_data():
@@ -1134,10 +1013,10 @@ def main():
 
     if page == "配置":
         config_page()
-    elif page == "数据":
-        main_page()
     elif page == "关于":
         about_page()
+    elif page in ("工作台", "数据"):
+        main_page()
     else:
         main_page()
 
