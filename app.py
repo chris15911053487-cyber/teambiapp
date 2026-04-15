@@ -128,6 +128,11 @@ class TeambitionAPI:
         result = self._request("GET", f"/v3/project/{project_id}/task/query",
                               params={"pageSize": page_size})
         return result.get("result", [])
+    
+    def get_task_worktime(self, task_id: str):
+        """获取任务工时"""
+        result = self._request("GET", f"/worktime/aggregation/task/{task_id}")
+        return result.get("result", [])
 
 
 def get_api_client():
@@ -154,29 +159,39 @@ def to_excel(df_list, sheet_names):
 def app_menu():
     """应用顶部导航菜单"""
     with st.sidebar:
-        st.markdown('<div class="sidebar-menu">', unsafe_allow_html=True)
+        # 应用标题
+        st.markdown('<div style="text-align: center; margin-bottom: 20px;">', unsafe_allow_html=True)
+        st.markdown('<h3 style="color: #007bff; margin-bottom: 5px;">Teambition API 工具</h3>', unsafe_allow_html=True)
+        st.markdown('<p style="color: #666; font-size: 14px;">高效管理企业数据</p>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
+        # 导航菜单
         selected = option_menu(
-            menu_title="导航菜单",
+            menu_title="",  # 移除菜单标题，使界面更简洁
             options=["首页", "数据", "配置", "关于"],
             icons=["house", "bar-chart", "gear", "info-circle"],
             menu_icon="cast",
             default_index=0,
             styles={
-                "container": {"padding": "0!important", "background-color": "#f8f9fa"},
-                "icon": {"color": "orange", "font-size": "25px"},
+                "container": {"padding": "10px", "background-color": "#f8f9fa", "border-radius": "10px"},
+                "icon": {"color": "#007bff", "font-size": "20px"},
                 "nav-link": {
-                    "font-size": "16px",
+                    "font-size": "15px",
                     "text-align": "left",
-                    "margin": "0px",
-                    "--hover-color": "#eee",
+                    "margin": "5px 0",
+                    "--hover-color": "#e6f2ff",
+                    "padding": "10px 15px",
                 },
-                "nav-link-selected": {"background-color": "#007bff"},
+                "nav-link-selected": {"background-color": "#007bff", "color": "white"},
             }
         )
 
-        st.markdown('</div>', unsafe_allow_html=True)
+        # 分隔线
+        st.markdown('---')
 
+        # 快捷操作按钮
+        st.markdown('<h4 style="color: #333; margin-bottom: 10px;">快捷操作</h4>', unsafe_allow_html=True)
+        
         if "open_tabs" not in st.session_state:
             st.session_state.open_tabs = ["首页"]
         if "active_tab" not in st.session_state:
@@ -187,13 +202,27 @@ def app_menu():
                 st.session_state.open_tabs.append(page_name)
             st.session_state.active_tab = page_name
 
-        if st.button("📂 打开数据页面", use_container_width=True):
-            open_tab("数据")
-        if st.button("⚙️ 打开配置页面", use_container_width=True):
-            open_tab("配置")
-        if st.button("❌ 关闭所有页签", use_container_width=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("� 数据", use_container_width=True, key="btn_data"):
+                open_tab("数据")
+        with col2:
+            if st.button("⚙️ 配置", use_container_width=True, key="btn_config"):
+                open_tab("配置")
+        
+        if st.button("❌ 关闭所有页签", use_container_width=True, key="btn_close"):
             st.session_state.open_tabs = ["首页"]
             st.session_state.active_tab = "首页"
+
+        # 状态信息
+        st.markdown('---')
+        st.markdown('<h4 style="color: #333; margin-bottom: 10px;">当前状态</h4>', unsafe_allow_html=True)
+        
+        has_token = "✅" if st.session_state.get('token') else "❌"
+        has_tenant = "✅" if st.session_state.get('tenant_id') else "❌"
+        
+        st.markdown(f"- Token: {has_token}")
+        st.markdown(f"- 企业ID: {has_tenant}")
 
     return selected
 
@@ -315,7 +344,7 @@ def about_page():
 def main_page():
     """主页面"""
     st.markdown('<h1 class="main-header">📊 Teambition API 工具</h1>', unsafe_allow_html=True)
-    st.markdown("获取企业信息、项目列表和任务数据，并导出到 Excel")
+    st.markdown("获取企业信息、项目列表、任务数据和工时信息，并导出到 Excel")
 
     # 欢迎信息和说明
     st.info("💡 **使用提示**: 请先在侧边栏菜单中选择“配置”页面，然后输入 API 凭证并获取 Token。")
@@ -340,11 +369,13 @@ def main_page():
     st.markdown("---")
     st.subheader("🚀 数据获取操作")
 
-    # 操作按钮 - 使用卡片式布局
-    col1, col2, col3 = st.columns(3)
+    # 操作按钮 - 使用卡片式布局（2列布局更整洁）
+    col1, col2 = st.columns(2)
 
     with col1:
-        with st.container():
+        # 第一行：企业信息和项目列表
+        subcol1, subcol2 = st.columns(2)
+        with subcol1:
             card(
                 title="🏢 企业信息",
                 text="获取当前企业的基本信息",
@@ -356,8 +387,7 @@ def main_page():
             else:
                 fetch_org = False
 
-    with col2:
-        with st.container():
+        with subcol2:
             card(
                 title="📁 项目列表",
                 text="获取企业下的所有项目",
@@ -369,8 +399,9 @@ def main_page():
             else:
                 fetch_projects = False
 
-    with col3:
-        with st.container():
+        # 第二行：全部数据和工时信息
+        subcol3, subcol4 = st.columns(2)
+        with subcol3:
             card(
                 title="🚀 全部数据",
                 text="获取企业信息、项目和所有任务",
@@ -381,6 +412,18 @@ def main_page():
                 fetch_all = True
             else:
                 fetch_all = False
+
+        with subcol4:
+            card(
+                title="⏱️ 工时信息",
+                text="获取任务的工时数据",
+                image="",
+                url=""
+            )
+            if st.button("获取工时信息", use_container_width=True, key="fetch_worktime"):
+                fetch_worktime = True
+            else:
+                fetch_worktime = False
     
     # 数据存储
     if 'org_data' not in st.session_state:
@@ -389,6 +432,8 @@ def main_page():
         st.session_state.projects_data = None
     if 'tasks_data' not in st.session_state:
         st.session_state.tasks_data = {}
+    if 'worktime_data' not in st.session_state:
+        st.session_state.worktime_data = {}
     
     # 获取企业信息
     if fetch_org or fetch_all:
@@ -434,6 +479,42 @@ def main_page():
         st.success(f"✅ 共获取 {total_tasks} 个任务!")
         progress_bar.empty()
     
+    # 获取工时信息
+    if fetch_worktime or fetch_all:
+        if st.session_state.tasks_data:
+            worktime_data = {}
+            total_tasks = sum(len(t['tasks']) for t in st.session_state.tasks_data.values())
+            current_task = 0
+            progress_bar = st.progress(0)
+            
+            for project_id, project_data in st.session_state.tasks_data.items():
+                project_name = project_data['name']
+                tasks = project_data['tasks']
+                
+                for task in tasks:
+                    task_id = task.get('id')
+                    task_name = task.get('name', '未命名')
+                    
+                    try:
+                        worktime = client.get_task_worktime(task_id)
+                        if worktime:
+                            worktime_data[task_id] = {
+                                'project_name': project_name,
+                                'task_name': task_name,
+                                'worktime': worktime
+                            }
+                    except Exception as e:
+                        pass  # 忽略工时获取失败的情况
+                    
+                    current_task += 1
+                    progress_bar.progress(current_task / total_tasks)
+            
+            st.session_state.worktime_data = worktime_data
+            st.success(f"✅ 共获取 {len(worktime_data)} 个任务的工时信息!")
+            progress_bar.empty()
+        else:
+            st.warning("⚠️ 请先获取任务数据，再获取工时信息")
+    
     # 显示数据
     display_data()
     
@@ -447,7 +528,8 @@ def display_data():
     # 检查是否有数据
     has_data = (st.session_state.org_data or
                 st.session_state.projects_data or
-                st.session_state.tasks_data)
+                st.session_state.tasks_data or
+                st.session_state.worktime_data)
 
     if not has_data:
         st.info("ℹ️ 暂无数据，请先获取数据")
@@ -518,6 +600,32 @@ def display_data():
                         st.info("📝 此项目暂无任务")
             st.markdown('</div>', unsafe_allow_html=True)
 
+    # 显示工时信息
+    if st.session_state.worktime_data:
+        with st.container():
+            st.markdown('<div class="card">', unsafe_allow_html=True)
+            st.markdown(f"### ⏱️ 工时信息 (共 {len(st.session_state.worktime_data)} 个任务)")
+            
+            # 转换为 DataFrame 显示
+            worktime_list = []
+            for task_id, data in st.session_state.worktime_data.items():
+                for worktime_item in data['worktime']:
+                    worktime_list.append({
+                        '项目名称': data['project_name'],
+                        '任务名称': data['task_name'],
+                        '对象ID': worktime_item.get('objectId', 'N/A'),
+                        '对象类型': worktime_item.get('objectType', 'N/A'),
+                        '工时(毫秒)': worktime_item.get('worktime', 0),
+                        '记录数量': worktime_item.get('count', 0)
+                    })
+            
+            if worktime_list:
+                worktime_df = pd.DataFrame(worktime_list)
+                st.dataframe(worktime_df, use_container_width=True)
+            else:
+                st.info("📝 暂无工时信息")
+            st.markdown('</div>', unsafe_allow_html=True)
+
 
 def export_data():
     """导出数据到 Excel"""
@@ -525,7 +633,8 @@ def export_data():
     # 检查是否有数据可以导出
     has_data = (st.session_state.org_data or
                 st.session_state.projects_data or
-                st.session_state.tasks_data)
+                st.session_state.tasks_data or
+                st.session_state.worktime_data)
 
     if not has_data:
         st.info("ℹ️ 暂无数据可以导出，请先获取数据")
@@ -538,7 +647,7 @@ def export_data():
     # 显示数据统计
     with st.container():
         st.markdown("### 📈 数据统计")
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns(5)
 
         with col1:
             has_org = 1 if st.session_state.org_data else 0
@@ -553,7 +662,14 @@ def export_data():
             st.metric("任务总数", f"{task_count} 个")
 
         with col4:
-            sheet_count = has_org + (1 if st.session_state.projects_data else 0) + len([data for data in st.session_state.tasks_data.values() if data['tasks']])
+            worktime_count = len(st.session_state.worktime_data) if st.session_state.worktime_data else 0
+            st.metric("工时记录", f"{worktime_count} 个")
+
+        with col5:
+            base_sheets = has_org + (1 if st.session_state.projects_data else 0)
+            task_sheets = len([data for data in st.session_state.tasks_data.values() if data['tasks']])
+            worktime_sheets = 1 if st.session_state.worktime_data else 0
+            sheet_count = base_sheets + task_sheets + worktime_sheets
             st.metric("Excel工作表", f"{sheet_count} 个")
 
         style_metric_cards()
@@ -588,6 +704,24 @@ def export_data():
                         sheet_name = f"任务-{safe_name[:15]}" if safe_name else f"任务-{project_id[:8]}"
                         df_list.append(tasks_df)
                         sheet_names.append(sheet_name)
+
+            # 工时信息
+            if st.session_state.worktime_data:
+                worktime_list = []
+                for task_id, data in st.session_state.worktime_data.items():
+                    for worktime_item in data['worktime']:
+                        worktime_list.append({
+                            '项目名称': data['project_name'],
+                            '任务名称': data['task_name'],
+                            '对象ID': worktime_item.get('objectId', 'N/A'),
+                            '对象类型': worktime_item.get('objectType', 'N/A'),
+                            '工时(毫秒)': worktime_item.get('worktime', 0),
+                            '记录数量': worktime_item.get('count', 0)
+                        })
+                if worktime_list:
+                    worktime_df = pd.DataFrame(worktime_list)
+                    df_list.append(worktime_df)
+                    sheet_names.append("工时信息")
 
             # 生成 Excel
             if df_list:
