@@ -189,33 +189,7 @@ def app_menu():
         # 分隔线
         st.markdown('---')
 
-        # 快捷操作按钮
-        st.markdown('<h4 style="color: #333; margin-bottom: 10px;">快捷操作</h4>', unsafe_allow_html=True)
-        
-        if "open_tabs" not in st.session_state:
-            st.session_state.open_tabs = ["首页"]
-        if "active_tab" not in st.session_state:
-            st.session_state.active_tab = "首页"
-
-        def open_tab(page_name: str):
-            if page_name not in st.session_state.open_tabs:
-                st.session_state.open_tabs.append(page_name)
-            st.session_state.active_tab = page_name
-
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("� 数据", use_container_width=True, key="btn_data"):
-                open_tab("数据")
-        with col2:
-            if st.button("⚙️ 配置", use_container_width=True, key="btn_config"):
-                open_tab("配置")
-        
-        if st.button("❌ 关闭所有页签", use_container_width=True, key="btn_close"):
-            st.session_state.open_tabs = ["首页"]
-            st.session_state.active_tab = "首页"
-
         # 状态信息
-        st.markdown('---')
         st.markdown('<h4 style="color: #333; margin-bottom: 10px;">当前状态</h4>', unsafe_allow_html=True)
         
         has_token = "✅" if st.session_state.get('token') else "❌"
@@ -747,34 +721,18 @@ def export_data():
     st.markdown('</div>', unsafe_allow_html=True)
 
 
-def render_tab_bar():
-    """渲染右侧多页签头部"""
-    if "open_tabs" not in st.session_state:
-        st.session_state.open_tabs = ["首页"]
-    if "active_tab" not in st.session_state:
-        st.session_state.active_tab = "首页"
 
-    st.markdown('<div style="display: flex; gap: 10px; margin-bottom: 20px;">', unsafe_allow_html=True)
-    cols = st.columns(len(st.session_state.open_tabs))
-    for i, tab_name in enumerate(st.session_state.open_tabs):
-        button_type = "primary" if tab_name == st.session_state.active_tab else "secondary"
-        if cols[i].button(tab_name, key=f"tab_{tab_name}", type=button_type, use_container_width=True):
-            st.session_state.active_tab = tab_name
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    return st.session_state.active_tab
 
 
 def main():
     """主函数"""
     page = app_menu()
-    active_tab = render_tab_bar()
 
-    if active_tab == "配置":
+    if page == "配置":
         config_page()
-    elif active_tab == "数据":
+    elif page == "数据":
         main_page()
-    elif active_tab == "关于":
+    elif page == "关于":
         about_page()
     else:
         main_page()
