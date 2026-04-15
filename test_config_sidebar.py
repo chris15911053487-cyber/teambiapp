@@ -8,7 +8,7 @@ import jwt
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-from config_sidebar import get_app_token, sign_app_access_jwt
+from config_sidebar import APP_TOKEN_PATH, OPEN_API_BASE, get_app_token, sign_app_access_jwt
 
 
 def test_sign_app_access_jwt_roundtrip():
@@ -39,3 +39,16 @@ def test_get_app_token_flat_app_token():
 
     with patch("config_sidebar.requests.post", return_value=mock_resp):
         assert get_app_token("a", "b") == "flat_token"
+
+
+def test_get_app_token_uses_official_openapi_app_token_path():
+    """与 @tng/teambition-openapi-sdk 一致：POST /api/appToken（勿用会 302 的 /v3/app/token）。"""
+    mock_resp = type("R", (), {})()
+    mock_resp.json = lambda: {"code": 200, "appToken": "t"}
+    mock_resp.status_code = 200
+
+    with patch("config_sidebar.requests.post", return_value=mock_resp) as post:
+        get_app_token("aid", "sec")
+    expected = f"{OPEN_API_BASE}{APP_TOKEN_PATH}"
+    post.assert_called_once()
+    assert post.call_args[0][0] == expected

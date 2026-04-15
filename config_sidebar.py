@@ -10,8 +10,9 @@ import jwt
 import requests
 import streamlit as st
 
-# 与开放平台「应用授权凭证」及官方 OpenAPI 客户端一致：先签发应用 JWT，再换取 app_access_token。
-# 网关地址见 https://open.teambition.com/docs —— 获取应用授权 Token 对应 POST /appToken（完整 URL 如下）。
+# 与开放平台「应用授权凭证」及 @tng/teambition-openapi-sdk 一致：本地用 appSecret 签 HS256 JWT，再 POST 换取 app_access_token。
+# 文档若写「POST https://open.teambition.com/v3/app/token」：请勿在浏览器打开该地址（会进登录页）；程序里请用下方官方网关路径。
+# 请求格式相同：Authorization: Bearer <应用 JWT>，Body: {"appId","appSecret"}。线上可调用的换票接口为 POST /api/appToken（非 /v3/app/token）。
 OPEN_API_BASE = "https://open.teambition.com/api"
 APP_TOKEN_PATH = "/appToken"
 

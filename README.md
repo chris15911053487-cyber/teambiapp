@@ -139,6 +139,13 @@ docker-compose up -d
 
 ### 1. 获取 Token
 
+**方式 A（推荐）**：在侧栏填写 **App ID** 与 **App Secret**，点击 **获取 Token**。应用会在本地用 `appSecret` 签 HS256 应用 JWT，再请求开放平台换票接口（与 `@tng/teambition-openapi-sdk` 的 `getAppAccessToken` 一致）：
+
+- 可调用的换票地址：`POST https://open.teambition.com/api/appToken`
+- 请勿在浏览器中打开 `https://open.teambition.com/v3/app/token`（会进入登录页）；若内部文档写该路径，程序侧应使用上面的 `/api/appToken`，请求格式相同（`Authorization: Bearer <应用 JWT>`，`{"appId","appSecret"}`）
+
+**方式 B**：手动从开放平台复制 Token
+
 1. 访问 [Teambition 开放平台](https://open.teambition.com/docs/apis/6321c6ce912d20d3b5a488f4)
 2. 点击 **调试** 按钮
 3. 复制 **Authorization** 中的 Token（去掉 `Bearer ` 前缀）
