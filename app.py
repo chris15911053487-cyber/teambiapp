@@ -228,30 +228,28 @@ def config_page():
     st.session_state['app_secret'] = app_secret
     st.session_state['tenant_id'] = tenant_id
 
-    if st.button("🔄 获取 Token", use_container_width=True, type="primary"):
-        # 弹出暗号输入框
-        with st.form(key='password_form'):
-            st.markdown("### 请输入暗号")
-            st.markdown("提示：暗号由 yyyymmdd 构成，例如今天是 20260415")
-            password = st.text_input("暗号", type="password")
-            submit_button = st.form_submit_button("验证并获取 Token")
-            
-            if submit_button:
-                # 验证暗号
-                import datetime
-                today = datetime.datetime.now().strftime("%Y%m%d")
-                if password == today:
-                    with st.spinner("获取 Token 中..."):
-                        try:
-                            token = get_app_token(app_id, app_secret)
-                            st.session_state['token'] = token
-                            st.success("✅ Token 获取成功!")
-                            st.caption("以下为完整 Access Token，可全选复制：")
-                            st.code(token, language=None)
-                        except Exception as e:
-                            st.error(f"❌ 错误: {e}")
-                else:
-                    st.error("❌ 暗号错误，请重新输入")
+    # 使用 form 来处理暗号验证和 token 获取
+    with st.form(key='password_form'):
+        st.markdown("### 请输入暗号")
+        password = st.text_input("暗号", type="password")
+        submit_button = st.form_submit_button("验证并获取 Token")
+        
+        if submit_button:
+            # 验证暗号
+            import datetime
+            today = datetime.datetime.now().strftime("%Y%m%d")
+            if password == today:
+                with st.spinner("获取 Token 中..."):
+                    try:
+                        token = get_app_token(app_id, app_secret)
+                        st.session_state['token'] = token
+                        st.success("✅ Token 获取成功!")
+                        st.caption("以下为完整 Access Token，可全选复制：")
+                        st.code(token, language=None)
+                    except Exception as e:
+                        st.error(f"❌ 错误: {e}")
+            else:
+                st.error("❌ 暗号错误，请重新输入")
 
     st.markdown("---")
     st.subheader("📊 当前配置状态")
