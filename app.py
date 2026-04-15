@@ -327,8 +327,7 @@ def about_page():
 
 def main_page():
     """主页面"""
-    st.markdown('<h1 class="main-header">📊 Teambition API 工具</h1>', unsafe_allow_html=True)
-    st.markdown("获取企业信息、项目列表、任务数据和工时信息，并导出到 Excel")
+
 
     # 欢迎信息和说明
     st.info("💡 **使用提示**: 请先在侧边栏菜单中选择“配置”页面，然后输入 API 凭证并获取 Token。")
@@ -351,15 +350,15 @@ def main_page():
 
     # 操作按钮区域
     st.markdown("---")
-    st.subheader("🚀 数据获取操作")
+    st.subheader("数据获取操作")
 
     # 操作按钮 - 使用紧凑的网格布局
-    st.markdown('<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px;">', unsafe_allow_html=True)
+    st.markdown('<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 15px;">', unsafe_allow_html=True)
     
     # 企业信息卡片
-    st.markdown('<div style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
-    st.markdown('### 🏢 企业信息')
-    st.markdown('获取当前企业的基本信息')
+    st.markdown('<div style="background-color: #f8f9fa; border-radius: 6px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
+    st.markdown('**企业信息**')
+    st.markdown('获取当前企业的基本信息', unsafe_allow_html=True)
     if st.button("获取企业信息", use_container_width=True, key="fetch_org"):
         fetch_org = True
     else:
@@ -367,9 +366,9 @@ def main_page():
     st.markdown('</div>', unsafe_allow_html=True)
     
     # 项目列表卡片
-    st.markdown('<div style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
-    st.markdown('### 📁 项目列表')
-    st.markdown('获取企业下的所有项目')
+    st.markdown('<div style="background-color: #f8f9fa; border-radius: 6px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
+    st.markdown('**项目列表**')
+    st.markdown('获取企业下的所有项目', unsafe_allow_html=True)
     if st.button("获取项目列表", use_container_width=True, key="fetch_projects"):
         fetch_projects = True
     else:
@@ -377,9 +376,9 @@ def main_page():
     st.markdown('</div>', unsafe_allow_html=True)
     
     # 全部数据卡片
-    st.markdown('<div style="background-color: #e6f2ff; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 4px solid #007bff;">', unsafe_allow_html=True)
-    st.markdown('### 🚀 全部数据')
-    st.markdown('获取企业信息、项目和所有任务')
+    st.markdown('<div style="background-color: #e6f2ff; border-radius: 6px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 3px solid #007bff;">', unsafe_allow_html=True)
+    st.markdown('**全部数据**')
+    st.markdown('获取企业信息、项目和所有任务', unsafe_allow_html=True)
     if st.button("获取全部数据", use_container_width=True, type="primary", key="fetch_all"):
         fetch_all = True
     else:
@@ -387,9 +386,9 @@ def main_page():
     st.markdown('</div>', unsafe_allow_html=True)
     
     # 工时信息卡片
-    st.markdown('<div style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
-    st.markdown('### ⏱️ 工时信息')
-    st.markdown('获取任务的工时数据')
+    st.markdown('<div style="background-color: #f8f9fa; border-radius: 6px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">', unsafe_allow_html=True)
+    st.markdown('**工时信息**')
+    st.markdown('获取任务的工时数据', unsafe_allow_html=True)
     if st.button("获取工时信息", use_container_width=True, key="fetch_worktime"):
         fetch_worktime = True
     else:
