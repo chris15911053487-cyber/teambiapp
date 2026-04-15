@@ -603,12 +603,79 @@ def main_page():
                 status_text.text("✅ 获取完成！")
                 
                 st.success(f"✅ 成功获取 {len(all_projects)} 个项目！")
-                if len(all_projects) > 50:
-                    st.info(f"💡 为了避免界面卡顿，在数据展示中只显示前 50 个项目。")
                 
+                # 分页表格显示
+                st.markdown("### 📊 项目列表（分页显示）")
+                
+                # 初始化分页状态
+                if 'projects_page' not in st.session_state:
+                    st.session_state.projects_page = 0
+                
+                # 分页控制
+                total_pages = (len(all_projects) + 49) // 50
+                col_prev, col_info, col_next = st.columns([1, 2, 1])
+                
+                with col_prev:
+                    if st.session_state.projects_page > 0:
+                        if st.button("⬅️ 上一页", use_container_width=True):
+                            st.session_state.projects_page -= 1
+                            st.rerun()
+                
+                with col_info:
+                    st.markdown(f"""<div style='text-align: center; color: #64748b;'>
+                        <strong>第 {st.session_state.projects_page + 1} 页 / 共 {total_pages} 页</strong><br>
+                        <small>每页显示 50 个项目，共 {len(all_projects)} 个项目</small>
+                    </div>""", unsafe_allow_html=True)
+                
+                with col_next:
+                    if st.session_state.projects_page < total_pages - 1:
+                        if st.button("➡️ 下一页", use_container_width=True):
+                            st.session_state.projects_page += 1
+                            st.rerun()
+                
+                # 显示当前页的数据
+                start_idx = st.session_state.projects_page * 50
+                end_idx = min(start_idx + 50, len(all_projects))
+                current_page_projects = all_projects[start_idx:end_idx]
+                
+                # 转换为DataFrame并显示主要列
+                import pandas as pd
+                
+                # 提取主要列
+                project_data = []
+                for project in current_page_projects:
+                    project_data.append({
+                        '序号': start_idx + current_page_projects.index(project) + 1,
+                        '项目ID': project.get('id', ''),
+                        '项目名称': project.get('name', '未命名'),
+                        '项目状态': project.get('status', '未知'),
+                        '创建时间': project.get('created', ''),
+                        '负责人': project.get('ownerId', '')
+                    })
+                
+                if project_data:
+                    df = pd.DataFrame(project_data)
+                    
+                    # 设置表格样式
+                    st.dataframe(
+                        df,
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config={
+                            '序号': st.column_config.NumberColumn(width='small'),
+                            '项目ID': st.column_config.TextColumn(width='medium'),
+                            '项目名称': st.column_config.TextColumn(width='large'),
+                            '项目状态': st.column_config.TextColumn(width='small'),
+                            '创建时间': st.column_config.TextColumn(width='medium'),
+                            '负责人': st.column_config.TextColumn(width='medium')
+                        }
+                    )
+                
+                # 返回按钮
                 if st.button("返回主界面", type="primary", use_container_width=True):
                     st.session_state.show_projects_ui = False
                     st.session_state.confirm_projects_fetch = False
+                    st.session_state.projects_page = 0
                     st.rerun()
             
             except Exception as e:
