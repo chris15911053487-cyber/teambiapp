@@ -1,357 +1,228 @@
-# Teambition API Tool  测试202604111228-1237 -0022 -0011-10-00
+# Teambition 数据工作台
 
-基于 Streamlit 的 Teambition API 图形化工具，支持数据导出到 Excel。
+基于 [Streamlit](https://streamlit.io) 的 Teambition Open API 图形化工具，用于拉取企业、项目、任务与工时数据，并导出为 Excel。
 
-## ✨ 功能特性
+## 功能特性
 
-- 🏢 **获取企业信息** - 查看企业名称、ID、创建时间等
-- 📁 **获取项目列表** - 查看所有项目及其详情
-- 📋 **获取任务列表** - 查看每个项目的任务
-- 📊 **导出 Excel** - 一键导出所有数据到 Excel 文件
-- 🔄 **自动更新** - 支持 Token 自动刷新（后续版本）
-- 🐳 **Docker 支持** - 支持 Docker 部署和运行
+- **企业信息**：查看企业名称、组织 ID、创建时间等
+- **项目列表**：支持游标分页（`pageToken` / `nextPageToken`）
+- **任务查询**（**重点增强**）：新增独立「任务」菜单
+  - 先调用 `/v3/project/{projectId}/stage/search` 获取**阶段/任务列表**（Kanban 列）
+  - 再调用 `/v3/project/{projectId}/task/query` 获取完整任务
+  - 支持单个项目查询 + 全部项目批量查询
+  - 自动关联阶段名称，提升数据可读性
+- **工时汇总**：在已有任务数据的基础上，按任务拉取工时聚合
+- **导出 Excel**：多 Sheet 导出（企业、项目、各项目任务、工时、阶段信息等）
+- **权限友好**：增强错误提示，明确指出需要开启的权限（`tb-core:project.stage:list` 等）
+- **Docker**：支持容器化部署
 
-## � CI/CD 自动化
+**核心解决**：之前「给了权限仍提示没有权限」的问题，现在有专门页面和详细指引。
 
-本项目使用 GitHub Actions 实现自动化 CI/CD：
+---
 
-### 📋 自动化流程
+## 界面说明（与当前 `app.py` 一致）
 
-- **PR 检查**: 每次提交 PR 时自动运行测试和代码质量检查
-- **主分支部署**: 推送到 `main` 分支时自动构建 Docker 镜像并部署到服务器
+### 左侧导航
 
-### 🔐 GitHub Secrets 配置
+| 菜单 | 说明 |
+|------|------|
+| **工作台** | 数据总览与快捷操作 |
+| **数据** | 项目、任务、工时批量拉取 |
+| **任务** | **新增**：专注任务查询，支持按项目拉取阶段（Kanban列）+ 任务，支持单个项目快速查询 |
+| **配置** | 暗号验证后获取 Access Token（见下文） |
+| **关于** | 简要说明与技术栈 |
 
-在 GitHub 仓库的 Settings > Secrets and variables > Actions 中配置以下密钥：
+侧边栏底部会显示 **Token / 企业 ID** 是否已配置。
 
-#### 腾讯云镜像仓库配置
-- `REGISTRY`: 腾讯云镜像仓库地址，例如 `ccr.ccs.tencentyun.com`
-- `TENCENT_CLOUD_ID`: 腾讯云镜像仓库登录用户名
-- `PASSWORD`: 腾讯云镜像仓库登录密码
-- `IMAGE_NAME`: 完整镜像仓库路径，例如 `ccr.ccs.tencentyun.com/命名空间/teambition-app`
+**重要**：**任务页面** 专门优化了权限问题，如果遇到「没有权限」，请重点检查开放平台应用权限配置。
 
-#### 服务器部署配置
-- `SERVER_HOST`: 服务器 IP 地址或域名
-- `SERVER_USER`: 服务器 SSH 用户名
-- `SSH_PRIVATE_KEY`: 服务器 SSH 私钥（用于无密码登录）
-- `SERVER_PORT`: SSH 端口（默认为 22）
+### 数据页主区域标签
 
-### 📝 配置步骤
+1. **操作面板**  
+   - **获取全部数据**：依次拉取企业信息、全部项目、全部项目任务，并在有任务数据时拉取工时。  
+   - **分步操作**：拉取企业信息、项目清单向导、拉取全部项目任务、拉取工时等。  
+   - **项目清单向导**：先请求第一页做预估，确认后再按游标分页拉取完整项目列表，并支持本地分页表格浏览。
 
-1. **准备服务器**
-   ```bash
-   # 确保服务器已安装 Docker
-   curl -fsSL https://get.docker.com | sh
+2. **数据展示**  
+   表格与折叠区展示已拉取的企业、项目（界面为控制性能可能仅预览部分项目）、各项目任务、工时等。
 
-   # 创建应用数据目录
-   sudo mkdir -p /opt/teambition-app/data
-   sudo chown $USER:$USER /opt/teambition-app/data
-   ```
+3. **导出 Excel**  
+   查看导出统计，点击生成后出现浏览器 **下载** 按钮；文件名带时间戳。
 
-2. **配置 SSH 密钥**
-   ```bash
-   # 在本地生成 SSH 密钥对
-   ssh-keygen -t rsa -b 4096 -C "github-actions@your-domain.com"
+---
 
-   # 将公钥添加到服务器的 authorized_keys
-   ssh-copy-id user@your-server
+## 快速开始
 
-   # 将私钥内容复制到 GitHub Secrets 的 SERVER_SSH_KEY
-   cat ~/.ssh/id_rsa
-   ```
+### 本地运行（开发）
 
-3. **配置 GitHub Secrets**
-   - 访问仓库 Settings > Secrets and variables > Actions
-   - 添加上述所有必需的 secrets
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
 
-4. **推送代码**
-   ```bash
-   git add .
-   git commit -m "Add CI/CD configuration"
-   git push origin main
-   ```
+浏览器访问：<http://localhost:8501>
 
-### 🔍 工作流文件
+### Docker
 
-- `.github/workflows/ci-cd.yml`: 主要的 CI/CD 工作流
-- `tests.py`: 单元测试文件
-- `requirements-dev.txt`: 开发依赖
-- `pytest.ini`: 测试配置
-- `deploy.sh`: 服务器部署脚本
+```bash
+docker build -t teambition-app .
+docker run -p 8501:8501 teambition-app
+```
 
-### 📊 测试覆盖率
+或使用 Compose：
 
-项目使用 pytest 和 coverage 进行测试，测试覆盖率要求 ≥ 80%。
+```bash
+docker-compose up -d
+```
 
-运行测试：
+访问：<http://localhost:8501>
+
+---
+
+## 使用流程
+
+### 1. 获取 Token（配置页）
+
+在侧边栏进入 **「配置」**：
+
+1. **暗号**为当天日期，格式 **`YYYYMMDD`**（与服务器当天日期一致）。
+2. 点击 **「验证并获取 Token」**。  
+   应用使用内置的 App ID / App Secret（见 `config_page` 内代码），在本地用 `appSecret` 签发 HS256 应用 JWT，再请求开放平台换票（与 `@tng/teambition-openapi-sdk` 的 `getAppAccessToken` 思路一致）。
+
+- 可调用的换票地址：`POST https://open.teambition.com/api/appToken`  
+- 请勿在浏览器直接打开易跳转登录页的文档路径；程序侧使用 **`/api/appToken`**，请求头 `Authorization: Bearer <应用 JWT>`，Body：`{"appId","appSecret"}`。
+
+成功后会写入会话中的 **Access Token**，页面可复制完整 Token。
+
+**备选**：也可在开放平台调试界面复制 Token，若你自行扩展界面支持手动粘贴，可写入会话使用（当前仓库以配置页暗号换票为主）。
+
+### 2. 企业 ID（Tenant）
+
+当前示例在代码中为 **固定企业 ID** 并写入会话；若你 fork 部署，请在 `app.py` 的 `config_page` 中改为自己的企业 ID，或改为从环境变量读取（需自行改代码）。
+
+### 3. 拉取与导出
+
+**推荐流程**：
+
+1. 进入 **「配置」** 页输入当天日期暗号获取 Token。
+2. 进入 **「数据」** 或 **「工作台」** 获取企业信息 + 项目列表。
+3. 切换到 **「任务」** 页：
+   - 点击「拉取全部项目任务和阶段」获取完整数据（推荐）
+   - 或选择单个项目进行快速查询
+4. 返回「数据」页查看结果，或直接在「任务」页浏览带阶段名称的任务表格。
+5. 在 **导出 Excel** 中生成多 Sheet 文件（现在包含阶段信息）。
+
+**权限问题解决**：如果接口返回权限错误，页面会给出具体指引，重点检查开放平台 → 你的应用 → 权限设置。
+
+---
+
+## 技术说明
+
+- **项目分页**：Open API v3 的 `/v3/project/query` 使用 **游标分页** (`pageToken`/`nextPageToken`)。
+- **任务查询**：新增 `search_project_stages()`（`/v3/project/{projectId}/stage/search`）和 `query_tasks()`（支持 `/v3/project/{projectId}/task/query` 或全局 `/v3/task/query`）。
+  - 自动获取阶段信息并映射到任务的 `stageName`。
+  - 增强 `_request()` 方法，提供详细的权限错误诊断（code 403、10133、authorization 等）。
+- **新增「任务」菜单**：独立页面，专注任务+阶段查询，解决常见「已授权但提示无权限」问题。
+- **Excel**：使用 `pandas` + `openpyxl` 多 Sheet 导出（新增阶段信息 sheet）。
+
+主要文件：
+
+- `app.py`：界面、增强的 `TeambitionAPI` 类（新增 `search_project_stages`、`query_tasks`、`get_all_project_tasks`）、`tasks_page()`  
+- `config_sidebar.py`：Token 获取逻辑
+
+**权限关键点**：必须在开放平台为应用勾选「项目自定义列表查看权限」和「任务相关权限」，保存后重新生成 Token。
+
+---
+
+## CI/CD 自动化
+
+本项目可使用 GitHub Actions 做测试与部署（以仓库内 `.github/workflows` 为准）。
+
+### 自动化流程（示例）
+
+- **PR / 推送**：运行测试与质量检查  
+- **主分支**：可选构建镜像并部署（取决于你的工作流配置）
+
+### GitHub Secrets（若使用腾讯云镜像 + SSH 部署）
+
+在仓库 **Settings → Secrets and variables → Actions** 中配置，例如：
+
+**镜像仓库**
+
+- `REGISTRY`：如 `ccr.ccs.tencentyun.com`  
+- `TENCENT_CLOUD_ID`、`PASSWORD`：登录凭据  
+- `IMAGE_NAME`：完整镜像路径  
+
+**服务器**
+
+- `SERVER_HOST`、`SERVER_USER`、`SSH_PRIVATE_KEY`、`SERVER_PORT`（可选）
+
+具体步骤与脚本以仓库内 `deploy.sh`、工作流 YAML 为准。
+
+### 测试
+
 ```bash
 pip install -r requirements-dev.txt
 pytest
 ```
 
-### 方式一：本地运行（推荐开发使用）
-
-#### 1. 安装依赖
-
-```bash
-pip install -r requirements.txt
-```
-
-#### 2. 启动应用
-
-```bash
-streamlit run app.py
-```
-
-#### 3. 访问应用
-
-打开浏览器访问：http://localhost:8501
-
 ---
 
-### 方式二：Docker 运行（推荐生产使用）
-
-#### 1. 构建镜像
-
-```bash
-docker build -t teambition-app .
-```
-
-#### 2. 运行容器
-
-```bash
-docker run -p 8501:8501 teambition-app
-```
-
-#### 或使用 Docker Compose
-
-```bash
-docker-compose up -d
-```
-
-#### 3. 访问应用
-
-打开浏览器访问：http://localhost:8501
-
----
-
-## 📖 使用说明
-
-### 1. 获取 Token
-
-**方式 A（推荐）**：在侧栏填写 **App ID** 与 **App Secret**，点击 **获取 Token**。应用会在本地用 `appSecret` 签 HS256 应用 JWT，再请求开放平台换票接口（与 `@tng/teambition-openapi-sdk` 的 `getAppAccessToken` 一致）：
-
-- 可调用的换票地址：`POST https://open.teambition.com/api/appToken`
-- 请勿在浏览器中打开 `https://open.teambition.com/v3/app/token`（会进入登录页）；若内部文档写该路径，程序侧应使用上面的 `/api/appToken`，请求格式相同（`Authorization: Bearer <应用 JWT>`，`{"appId","appSecret"}`）
-
-**方式 B**：手动从开放平台复制 Token
-
-1. 访问 [Teambition 开放平台](https://open.teambition.com/docs/apis/6321c6ce912d20d3b5a488f4)
-2. 点击 **调试** 按钮
-3. 复制 **Authorization** 中的 Token（去掉 `Bearer ` 前缀）
-
-![获取 Token 步骤](https://example.com/token-guide.png)
-
-### 2. 配置应用
-
-在左侧边栏输入：
-- **Access Token**: 从上一步获取的 Token
-- **企业 ID**: 你的 Teambition 企业 ID
-
-### 3. 获取数据
-
-点击按钮获取数据：
-- 🏢 **获取企业信息** - 仅获取企业基本信息
-- 📁 **获取项目列表** - 获取项目列表
-- 🚀 **获取全部数据** - 获取企业、项目和所有任务
-
-### 4. 导出 Excel
-
-1. 点击 **"生成 Excel 文件"** 按钮
-2. 等待生成完成
-3. 点击 **"下载 Excel 文件"** 按钮下载
-
----
-
-## 🐳 Docker 部署详解
-
-### 为什么使用 Docker？
-
-| 优势 | 说明 |
-|------|------|
-| 🚀 一键部署 | 无需配置 Python 环境，一条命令启动 |
-| 🔄 环境隔离 | 避免与其他项目依赖冲突 |
-| 📦 便于分发 | 打包后可在任何机器运行 |
-| 🛡️ 生产就绪 | 内置健康检查和自动重启 |
-
-### Docker 常用命令
-
-```bash
-# 构建镜像
-docker build -t teambition-app .
-
-# 运行容器
-docker run -d -p 8501:8501 --name teambition-app teambition-app
-
-# 查看日志
-docker logs -f teambition-app
-
-# 停止容器
-docker stop teambition-app
-
-# 删除容器
-docker rm teambition-app
-
-# 更新镜像（代码更新后）
-docker build -t teambition-app .
-docker stop teambition-app
-docker rm teambition-app
-docker run -d -p 8501:8501 --name teambition-app teambition-app
-```
-
-### Docker Compose 部署（推荐）
-
-```bash
-# 启动服务
-docker-compose up -d
-
-# 查看日志
-docker-compose logs -f
-
-# 停止服务
-docker-compose down
-
-# 重启服务
-docker-compose restart
-
-# 更新服务（代码更新后）
-docker-compose down
-docker-compose build
-docker-compose up -d
-```
-
----
-
-## 🔄 代码更新迭代
-
-### 更新流程
-
-#### 本地开发模式
-
-```bash
-# 1. 修改代码（app.py 等文件）
-# 2. 测试运行
-streamlit run app.py
-# 3. 提交代码
-git add .
-git commit -m "更新说明"
-```
-
-#### Docker 部署模式
-
-```bash
-# 1. 修改代码
-# 2. 重新构建镜像
-docker-compose down
-docker-compose build
-docker-compose up -d
-```
-
-### 版本管理建议
-
-```bash
-# 使用 Git 管理代码
-git init
-git add .
-git commit -m "初始版本"
-
-# 添加新功能后
-git add .
-git commit -m "添加 XX 功能"
-
-# 查看历史
-git log
-```
-
----
-
-## 📁 项目结构
+## 项目结构（节选）
 
 ```
 teambition-app/
-├── app.py              # 主应用代码
-├── requirements.txt    # Python 依赖
-├── Dockerfile         # Docker 镜像配置
-├── docker-compose.yml # Docker Compose 配置
-├── .env.example       # 环境变量示例
-└── README.md          # 使用说明
+├── app.py                 # 主应用（Streamlit UI + API）
+├── config_sidebar.py      # 换票、JWT 等
+├── requirements.txt
+├── requirements-dev.txt
+├── Dockerfile
+├── docker-compose.yml
+├── .env.example
+├── pytest.ini
+├── deploy.sh              # 若存在，部署脚本
+└── README.md
 ```
 
 ---
 
-## ⚙️ 高级配置
+## 环境变量（可选）
 
-### 环境变量
-
-创建 `.env` 文件：
-
-```env
-TEAMBITION_TOKEN=your_token
-TEAMBITION_TENANT_ID=your_tenant_id
-```
-
-### 自定义端口
-
-修改 `docker-compose.yml`：
-
-```yaml
-ports:
-  - "8080:8501"  # 将 8080 映射到容器的 8501
-```
-
-访问：http://localhost:8080
+可参考 `.env.example`。是否在应用启动时自动读取 Token / Tenant，取决于你是否在代码中接入 `python-dotenv` 与对应变量名；当前主流程以页面会话为准。
 
 ---
 
-## 🐛 常见问题
+## 常见问题
 
-### Q: Token 过期怎么办？
-A: Token 有效期约 30 分钟，过期后需要重新从开放平台获取。
+**Q：Token 过期怎么办？**  
+A：应用 Token 有效期以开放平台为准，过期后回到 **配置** 页用当日暗号重新获取。
 
-### Q: 如何持久化数据？
-A: 已配置 Docker volumes，数据会自动保存到 `./data` 目录。
+**Q：数据存在哪里？**  
+A：拉取结果在 Streamlit **会话状态**中；Excel 通过浏览器下载到本机下载目录。Docker 若挂载 `./data`，用途以你的 Compose 配置为准。
 
-### Q: 如何查看日志？
-A: 
+**Q：如何看容器日志？**  
+
 ```bash
-# Docker 模式
 docker logs -f teambition-app
-
-# Docker Compose 模式
+# 或
 docker-compose logs -f
 ```
 
-### Q: 如何备份数据？
-A: Excel 文件会自动下载到浏览器默认下载目录，建议定期备份。
+---
+
+## 安全提示
+
+1. **不要将真实 App Secret、Token 提交到公开仓库。** 若代码中含固定凭证，部署前请改为环境变量或私密配置，并轮换密钥。  
+2. 生产环境建议 **HTTPS**、访问控制（防火墙 / 认证）。  
+3. 暗号仅用于当前示例的日更校验，正式环境请改用更安全的登录或密钥管理。
 
 ---
 
-## 🔒 安全提示
+## 文档与反馈
 
-1. **不要硬编码 Token** - 使用环境变量或侧边栏输入
-2. **定期更换 Token** - Token 有效期短，安全性较高
-3. **注意网络安全** - 生产环境建议配置 HTTPS
-4. **限制访问权限** - 使用防火墙限制访问 IP
+- Teambition 开放平台：<https://open.teambition.com/docs>  
+- 问题反馈：在本仓库提交 Issue  
 
----
-
-## 📞 技术支持
-
-- 文档：https://open.teambition.com/docs
-- 问题反馈：请在项目中提交 Issue
-
----
-
-## 📄 许可证
+## 许可证
 
 MIT License

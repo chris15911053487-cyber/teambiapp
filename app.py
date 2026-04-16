@@ -84,19 +84,38 @@ class TeambitionAPI:
         }
     
     def _request(self, method: str, endpoint: str, **kwargs):
+        """统一请求方法，增强权限错误提示"""
         url = f"{self.BASE_URL}{endpoint}"
         headers = self._get_headers()
-        
+
         if "headers" in kwargs:
             headers.update(kwargs.pop("headers"))
-        
+
         response = requests.request(method, url, headers=headers, **kwargs)
         result = response.json()
-        
+
         code = result.get("code")
+        error_message = result.get("errorMessage", "")
+
         if code is not None and code not in [0, 200]:
-            raise Exception(f"API 错误: {result.get('errorMessage')} (code: {code})")
-            
+            # 增强权限错误提示
+            if code in [403, 10133] or "permission" in error_message.lower() or "权限" in error_message or "authorization" in error_message.lower():
+                error_detail = f"""
+API 权限错误: {error_message} (code: {code})
+
+常见原因及解决办法：
+1. 在 Teambition 开放平台该应用中，需开启以下权限：
+   - 项目自定义列表查看权限 (tb-core:project.stage:list) —— 用于 /stage/search
+   - 项目任务查看权限 (tb-core:project.task:list) —— 用于 /task/query
+   - 任务相关读取权限
+2. 保存权限变更后，**必须重新生成 Token**（重新在「配置」页验证暗号）
+3. 确认 X-Tenant-Id 与 Token 所属企业一致
+4. 检查项目是否在应用可见范围内
+                """.strip()
+                raise Exception(error_detail)
+            else:
+                raise Exception(f"API 错误: {error_message} (code: {code})")
+
         return result
     
     def get_org_info(self):
@@ -176,7 +195,76 @@ class TeambitionAPI:
                 break
 
         return all_tasks
-    
+
+    def search_project_stages(self, project_id: str, page_size: int = 50):
+        """搜索项目下的任务列表/阶段 (Kanban 列)。
+        对应文档：/v3/project/{projectId}/stage/search
+        需要权限：tb-core:project.stage:list
+        """
+        params = {"pageSize": page_size}
+        result = self._request("GET", f"/v3/project/{project_id}/stage/search", params=params)
+        return result.get("result", [])
+
+    def query_tasks(self, project_id: str = None, stage_id: str = None, page_size: int = 50, page_token=None):
+        """通用任务查询接口。
+        - 使用 /v3/task/query (全局查询，可按 projectId 过滤)
+        - 或保持使用项目专属 /v3/project/{projectId}/task/query
+        """
+        params = {"pageSize": page_size}
+        if page_token:
+            params["pageToken"] = page_token
+        if project_id:
+            params["projectId"] = project_id
+        if stage_id:
+            params["stageId"] = stage_id
+
+        if project_id:
+            # 优先使用项目专属接口（更高效，权限更明确）
+            endpoint = f"/v3/project/{project_id}/task/query"
+        else:
+            endpoint = "/v3/task/query"
+
+        result = self._request("GET", endpoint, params=params)
+        return result.get("result", []), self.project_query_next_token(result)
+
+    def get_all_project_tasks(self, projects, page_size: int = 50):
+        """获取所有项目的任务（增强版，支持阶段信息）"""
+        all_tasks_data = {}
+        for project in projects:
+            project_id = project.get('id')
+            project_name = project.get('name', '未命名')
+
+            try:
+                # 先获取该项目的阶段（可选，用于丰富任务展示）
+                stages = self.search_project_stages(project_id, page_size)
+                stage_map = {s.get('id'): s.get('name', '未命名') for s in stages}
+
+                # 获取任务
+                tasks = []
+                page_token = None
+                while True:
+                    page_tasks, next_token = self.query_tasks(
+                        project_id=project_id,
+                        page_token=page_token,
+                        page_size=page_size
+                    )
+                    tasks.extend(page_tasks)
+                    page_token = next_token
+                    if not page_token:
+                        break
+
+                all_tasks_data[project_id] = {
+                    'name': project_name,
+                    'tasks': tasks,
+                    'stages': stages,
+                    'stage_map': stage_map
+                }
+            except Exception as e:
+                # 让上层捕获并显示友好提示
+                raise Exception(f"项目 [{project_name}] 任务获取失败: {str(e)}") from e
+
+        return all_tasks_data
+
     def get_task_worktime(self, task_id: str):
         """获取任务工时"""
         result = self._request("GET", f"/worktime/aggregation/task/{task_id}")
@@ -216,8 +304,8 @@ def app_menu():
 
         selected = option_menu(
             menu_title="导航",
-            options=["工作台", "数据", "配置", "关于"],
-            icons=["house", "bar-chart", "gear", "info-circle"],
+            options=["工作台", "数据", "任务", "配置", "关于"],
+            icons=["house", "bar-chart", "list-task", "gear", "info-circle"],
             menu_icon="window-sidebar",
             default_index=0,
             styles={
@@ -700,29 +788,22 @@ def main_page():
             except Exception as e:
                 st.error(f"❌ 错误: {e}")
     
-    # 获取所有项目的任务
+    # 获取所有项目的任务（增强版：同时获取阶段信息）
     if fetch_all and st.session_state.projects_data:
-        tasks_data = {}
         progress_bar = st.progress(0)
-        
-        for i, project in enumerate(st.session_state.projects_data):
-            project_id = project.get('id')
-            project_name = project.get('name', '未命名')
-            
-            try:
-                tasks = client.get_project_tasks(project_id, page_size=50)
-                tasks_data[project_id] = {
-                    'name': project_name,
-                    'tasks': tasks
-                }
-                progress_bar.progress((i + 1) / len(st.session_state.projects_data))
-            except Exception as e:
-                st.warning(f"获取项目 [{project_name}] 的任务失败: {e}")
-        
-        st.session_state.tasks_data = tasks_data
-        total_tasks = sum(len(t['tasks']) for t in tasks_data.values())
-        st.success(f"✅ 共获取 {total_tasks} 个任务!")
-        progress_bar.empty()
+        try:
+            with st.spinner("正在按项目拉取任务和阶段信息...（这可能需要较长时间）"):
+                tasks_data = client.get_all_project_tasks(
+                    st.session_state.projects_data,
+                    page_size=50
+                )
+                st.session_state.tasks_data = tasks_data
+                total_tasks = sum(len(data['tasks']) for data in tasks_data.values())
+                st.success(f"✅ 共获取 {total_tasks} 个任务! (来自 {len(tasks_data)} 个项目)")
+                progress_bar.empty()
+        except Exception as e:
+            st.error(f"❌ 获取任务失败: {str(e)}")
+            progress_bar.empty()
     
     # 获取工时信息
     if fetch_worktime or fetch_all:
@@ -831,7 +912,7 @@ def display_data():
                     st.info(f"💡 为了避免界面卡顿，只显示了前 50 个项目。导出 Excel 时会包含所有 {total_projects} 个项目。")
             st.markdown('</div>', unsafe_allow_html=True)
 
-    # 显示项目任务
+    # 显示项目任务（增强版：显示阶段信息）
     if st.session_state.tasks_data:
         with st.container():
             st.markdown('<div class="card">', unsafe_allow_html=True)
@@ -839,16 +920,39 @@ def display_data():
             st.markdown(f"### 📋 项目任务详情 (共 {total_tasks} 个任务)")
 
             for project_id, data in st.session_state.tasks_data.items():
-                project_name = data['name']
-                tasks = data['tasks']
+                project_name = data.get('name', '未命名')
+                tasks = data.get('tasks', [])
+                stages = data.get('stages', [])
+                stage_map = data.get('stage_map', {})
 
-                with st.expander(f"📂 {project_name} ({len(tasks)} 个任务)"):
+                stage_info = f" | {len(stages)} 个阶段" if stages else ""
+                with st.expander(f"📂 {project_name} ({len(tasks)} 个任务{stage_info})"):
+                    if stages:
+                        st.markdown("**📍 项目阶段 (Kanban 列):**")
+                        stage_df = pd.DataFrame([{"阶段ID": s.get('id'), "阶段名称": s.get('name'), "tasklistId": s.get('tasklistId')} for s in stages])
+                        st.dataframe(stage_df, use_container_width=True, hide_index=True)
+
                     if tasks:
                         tasks_df = pd.DataFrame(tasks)
-                        # 选择要显示的列
-                        task_cols = ['name', 'content', 'executor', 'stage', 'created', 'updated']
-                        available_task_cols = [c for c in task_cols if c in tasks_df.columns]
-                        st.dataframe(tasks_df[available_task_cols], use_container_width=True)
+                        # 增强显示：如果有 stageId，映射为阶段名称
+                        if 'stageId' in tasks_df.columns and stage_map:
+                            tasks_df['stageName'] = tasks_df['stageId'].map(stage_map).fillna(tasks_df.get('stageId', ''))
+                            display_cols = ['name', 'stageName', 'content', 'executor', 'created', 'updated']
+                        else:
+                            display_cols = ['name', 'content', 'executor', 'stage', 'created', 'updated']
+
+                        available_cols = [c for c in display_cols if c in tasks_df.columns or c == 'stageName']
+                        st.dataframe(
+                            tasks_df[available_cols] if 'stageName' in available_cols else tasks_df[available_cols],
+                            use_container_width=True,
+                            hide_index=True,
+                            column_config={
+                                "name": st.column_config.TextColumn("任务名称", width="large"),
+                                "stageName": st.column_config.TextColumn("阶段", width="medium"),
+                                "content": st.column_config.TextColumn("内容", width="large"),
+                                "executor": st.column_config.TextColumn("执行者", width="medium"),
+                            }
+                        )
                     else:
                         st.info("📝 此项目暂无任务")
             st.markdown('</div>', unsafe_allow_html=True)
@@ -1007,6 +1111,91 @@ def export_data():
 
 
 
+def tasks_page():
+    """专用任务查询页面 - 聚焦于按项目/阶段查询任务"""
+    st.markdown('<h1 class="main-header">📋 任务查询</h1>', unsafe_allow_html=True)
+    st.markdown("""
+    使用官方推荐接口：
+    1. `/v3/project/{projectId}/stage/search` 获取项目**阶段**（Kanban 列）
+    2. `/v3/project/{projectId}/task/query` 获取该项目下的**所有任务**
+
+    **权限提示**：如果仍提示「没有权限」，请在 [Teambition 开放平台](https://open.teambition.com) 的应用设置中开启：
+    - `tb-core:project.stage:list`（项目自定义列表查看权限）
+    - `tb-core:project.task:list`（项目任务查看权限）
+    保存权限后**必须重新获取 Token**（在「配置」页重新验证暗号）。
+    """)
+
+    client = get_api_client()
+    if not client:
+        st.warning("⚠️ 请先在「配置」中完成 Token 与企业 ID 配置。")
+        return
+
+    # 操作按钮
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔄 拉取全部项目任务和阶段（推荐）", type="primary", use_container_width=True, key="fetch_all_tasks_btn"):
+            if st.session_state.get('projects_data'):
+                try:
+                    with st.spinner("正在批量拉取所有项目的任务和阶段信息..."):
+                        tasks_data = client.get_all_project_tasks(st.session_state.projects_data, page_size=30)
+                        st.session_state.tasks_data = tasks_data
+                        total_tasks = sum(len(d.get('tasks', [])) for d in tasks_data.values())
+                        st.success(f"✅ 成功！共获取 **{total_tasks}** 个任务（来自 {len(tasks_data)} 个项目）")
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"❌ {str(e)}")
+            else:
+                st.error("请先在「数据」页面获取项目列表")
+                st.info("💡 切换到「数据」页 → 点击「获取全部数据」或「拉取全部项目任务」")
+
+    with col2:
+        if st.button("🧹 清空任务缓存", use_container_width=True, key="clear_tasks_btn"):
+            st.session_state.tasks_data = {}
+            st.success("任务数据已清空")
+            st.rerun()
+
+    # 单个项目查询
+    if st.session_state.get('projects_data'):
+        st.markdown("### 🎯 单个项目快速查询")
+        project_options = [f"{p.get('name', '未命名')} ({p.get('id')[:8]}...)" for p in st.session_state.projects_data[:15]]
+        selected_idx = st.selectbox(
+            "选择项目",
+            range(len(project_options)),
+            format_func=lambda x: project_options[x],
+            key="task_project_select"
+        )
+        selected_project = st.session_state.projects_data[selected_idx]
+        project_id = selected_project.get('id')
+        project_name = selected_project.get('name', '未命名')
+
+        if st.button(f"🔍 查询「{project_name}」的任务和阶段", type="secondary", key="single_project_query"):
+            try:
+                with st.spinner(f"查询 {project_name} ..."):
+                    stages = client.search_project_stages(project_id)
+                    tasks, _ = client.query_tasks(project_id=project_id, page_size=100)
+                    stage_map = {s.get('id'): s.get('name', '未命名阶段') for s in stages}
+
+                    st.session_state.tasks_data = {
+                        project_id: {
+                            'name': project_name,
+                            'tasks': tasks,
+                            'stages': stages,
+                            'stage_map': stage_map
+                        }
+                    }
+                    st.success(f"✅ 获取到 **{len(tasks)}** 个任务，**{len(stages)}** 个阶段")
+                    st.rerun()
+            except Exception as e:
+                st.error(f"查询失败: {str(e)}")
+
+    # 显示结果
+    if st.session_state.get('tasks_data'):
+        display_data()
+    else:
+        st.info("👆 点击上方按钮开始查询任务。\n\n"
+                "本页面专门优化了**阶段 + 任务**的查询流程，能更好地解决权限问题。")
+
+
 def main():
     """主函数"""
     page = app_menu()
@@ -1015,6 +1204,8 @@ def main():
         config_page()
     elif page == "关于":
         about_page()
+    elif page == "任务":
+        tasks_page()
     elif page in ("工作台", "数据"):
         main_page()
     else:
