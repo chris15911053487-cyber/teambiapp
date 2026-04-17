@@ -2,22 +2,20 @@
 
 基于 [Streamlit](https://streamlit.io) 的 Teambition Open API 图形化工具，用于拉取企业、项目、任务与工时数据，并导出为 Excel。
 
-## 功能特性
+## 功能特性 (重构后)
 
-- **企业信息**：查看企业名称、组织 ID、创建时间等
-- **项目列表**：支持游标分页（`pageToken` / `nextPageToken`）
-- **任务查询**（**重点增强**）：新增独立「任务」菜单
-  - 先调用 `/v3/project/{projectId}/stage/search` 获取**阶段**（Kanban 列）
-  - 再调用 **`GET /v3/task/query`**（query 中 `filter` 含 `projectId`，并分页）拉取该项目下**任务列表**
-  - 支持单个项目查询 + 全部项目批量查询
-  - 自动关联阶段名称，提升数据可读性
-- **工时汇总**：在已有任务数据的基础上，按任务拉取工时聚合
-- **导出 Excel**：多 Sheet 导出（企业、项目、各项目任务、工时、阶段信息等）
-- **权限友好**：增强错误提示，明确指出需要开启的权限（`tb-core:project.stage:list` 等）
-- **API 请求调试**：侧边栏可开启「显示 API 请求报文」，在「任务」页查看每次发往 Teambition 的 URL、Headers（界面展示为脱敏）、Query 参数及响应；每条记录支持 **一键复制完整报文**（含**未脱敏** Headers、响应 JSON 与 **cURL**），便于粘贴到 **Postman**（Import → Raw text）或记事本对照
-- **Docker**：支持容器化部署
+- **认证**：暗号 (YYYYMMDD) 验证获取 Token，支持侧边栏 App ID/Secret 配置。
+- **数据中心**：统一拉取企业信息、项目列表 (游标分页)、任务查询 (filter + stage mapping)、工时聚合。支持单个项目明细查询。
+- **API记录**：所有请求 (URL, Headers, Params, Response, cURL) 集中显示，支持搜索、复制、过滤、清空。
+- **接口配置**：**新** 可视化 UI 维护端点、参数、resolver (动态参数解析如 build_task_filter)。支持测试调用、JSON 持久化，无需修改代码即可扩展接口。
+- **导出 Excel**：多 Sheet (企业、项目、任务、工时、阶段)，使用 pandas/openpyxl。
+- **权限友好**：保留增强错误提示 (具体权限指引)。
+- **动态客户端**： `TeambitionAPI.call("query_tasks", project_id=xxx)` 使用 registry + resolvers。
+- **Docker**：支持容器化部署。
 
-**核心解决**：之前「给了权限仍提示没有权限」的问题，现在有专门页面和详细指引；配合请求报文可快速核对 `X-Tenant-Id`、项目 ID、换票后的 Token 是否一致。
+**核心改进**：消除「数据」和「任务」菜单重叠；接口地址/参数/取值方法可通过 UI 配置维护；API 记录独立页面。所有调用自动调试记录。
+
+**核心解决**：权限问题通过详细指引和记录快速排查；配置化使维护更灵活。
 
 ---
 
@@ -107,19 +105,17 @@ docker-compose up -d
 
 当前示例在代码中为 **固定企业 ID** 并写入会话；若你 fork 部署，请在 `app.py` 的 `config_page` 中改为自己的企业 ID，或改为从环境变量读取（需自行改代码）。
 
-### 3. 拉取与导出
+### 使用流程 (新菜单)
 
-**推荐流程**：
+1. **认证** 页：输入当日暗号 (YYYYMMDD) 获取 Token (或侧边栏手动配置 App ID/Secret)。
+2. **数据中心** 页：
+   - 操作面板：点击按钮拉取企业信息、项目、全部任务+阶段、工时。
+   - 数据明细：选择项目查询详情 (使用动态 call)。
+   - 导出 Excel：生成多 Sheet 文件。
+3. **接口配置** 页：查看/编辑接口 (endpoint, resolvers, params)，测试调用。
+4. **API记录** 页：查看所有请求日志、复制 cURL 用于 Postman 调试。
 
-1. 进入 **「配置」** 页输入当天日期暗号获取 Token。
-2. 进入 **「数据」** 或 **「工作台」** 获取企业信息 + 项目列表。
-3. 切换到 **「任务」** 页：
-   - 点击「拉取全部项目任务和阶段」获取完整数据（推荐）
-   - 或选择单个项目进行快速查询
-4. 返回「数据」页查看结果，或直接在「任务」页浏览带阶段名称的任务表格。
-5. 在 **导出 Excel** 中生成多 Sheet 文件（现在包含阶段信息）。
-
-**权限问题解决**：如果接口返回权限错误，页面会给出具体指引，重点检查开放平台 → 你的应用 → 权限设置。
+**权限问题解决**：错误提示具体到所需权限 (`tb-core:project.stage:list` 等)；结合 API记录页对比开放平台调试结果。保存权限后重新在认证页获取 Token。
 
 ### 4. 查看发往 Teambition 的请求报文（可选）
 
@@ -201,21 +197,27 @@ pytest
 
 ---
 
-## 项目结构（节选）
+## 项目结构（重构后）
 
 ```
 teambition-app/
-├── app.py                 # 主应用（Streamlit UI + API）
-├── config_sidebar.py      # 换票、JWT 等
+├── app.py                 # 主应用（Streamlit UI + TeambitionAPI + 新 dynamic call / pages: auth_page, data_center_page, api_config_page, api_records_page）
+├── config_sidebar.py      # Token 获取 (JWT, get_app_token) - 集成到认证页
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .env.example
 ├── pytest.ini
-├── deploy.sh              # 若存在，部署脚本
+├── deploy.sh
+├── tests.py
 └── README.md
 ```
+
+**主要变更**：
+- `TeambitionAPI` 扩展了 `call(name, **context)` 动态方法 + registry (DEFAULT_API_CONFIGS, resolve_param)。
+- 新页面：`api_config_page()` (data_editor + test), `data_center_page()` (合并), `api_records_page()`, `auth_page()`。
+- Session state 管理 api_configs, 所有调用自动调试。
 
 ---
 

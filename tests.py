@@ -12,7 +12,7 @@ import os
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app import TeambitionAPI, get_api_client, to_excel
+from app import TeambitionAPI, get_api_client, to_excel, DEFAULT_API_CONFIGS
 import pandas as pd
 
 
@@ -64,8 +64,10 @@ class TestTeambitionAPI(unittest.TestCase):
         self.assertIn("API 错误", str(context.exception))
 
     @patch('app.requests.request')
-    def test_get_org_info(self, mock_request):
-        """测试获取企业信息"""
+    @patch('app.st.session_state')
+    def test_get_org_info(self, mock_session, mock_request):
+        """测试获取企业信息 (新 dynamic path)"""
+        mock_session.get.return_value = DEFAULT_API_CONFIGS  # mock configs
         mock_response = Mock()
         mock_response.json.return_value = {"code": 200, "result": {"name": "Test Org"}}
         mock_request.return_value = mock_response
@@ -73,7 +75,7 @@ class TestTeambitionAPI(unittest.TestCase):
         result = self.api.get_org_info()
 
         self.assertEqual(result, {"code": 200, "result": {"name": "Test Org"}})
-        mock_request.assert_called_with("GET", "https://open.teambition.com/api/org/info", headers=self.api._get_headers())
+        mock_request.assert_called_with("GET", "https://open.teambition.com/api/org/info", headers=self.api._get_headers(), params={})
 
     @patch('app.requests.request')
     def test_get_projects(self, mock_request):
