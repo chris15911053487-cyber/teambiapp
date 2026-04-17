@@ -4,7 +4,7 @@
 
 ## 功能特性 (重构后)
 
-- **认证**：暗号 (YYYYMMDD) 验证获取 Token，支持侧边栏 App ID/Secret 配置。
+- **认证**：在页面选择企业（应用凭证由服务端绑定，界面不展示 AppId/Secret/企业ID），再输入暗号换票；暗号输入为密码框且不提示生成规则。
 - **数据中心**：统一拉取企业信息、项目列表 (游标分页)、任务查询 (filter + stage mapping)、工时聚合。支持单个项目明细查询。
 - **API记录**：所有请求 (URL, Headers, Params, Response, cURL) 集中显示，支持搜索、复制、过滤、清空。
 - **接口配置**：**新** 可视化 UI 维护端点、参数、resolver (动态参数解析如 build_task_filter)。支持测试调用、JSON 持久化，无需修改代码即可扩展接口。
@@ -86,28 +86,21 @@ docker-compose up -d
 
 ## 使用流程
 
-### 1. 获取 Token（配置页）
+### 1. 获取 Token（认证页）
 
-在侧边栏进入 **「配置」**：
+1. 在 **「认证」** 页选择企业（多企业时在 `config_sidebar.py` 的 `COMPANY_PROFILES` 中维护；界面仅显示公司名，不展示 AppId/Secret/企业ID）。
+2. 输入暗号并提交 **「验证并获取 Token」**（暗号为密码输入，界面不说明生成规则）。  
+   换票逻辑：本地用 `appSecret` 签发 HS256 应用 JWT，再 `POST https://open.teambition.com/api/appToken`（与 `@tng/teambition-openapi-sdk` 的 `getAppAccessToken` 思路一致）。
 
-1. **暗号**为当天日期，格式 **`YYYYMMDD`**（与服务器当天日期一致）。
-2. 点击 **「验证并获取 Token」**。  
-   应用使用内置的 App ID / App Secret（见 `config_page` 内代码），在本地用 `appSecret` 签发 HS256 应用 JWT，再请求开放平台换票（与 `@tng/teambition-openapi-sdk` 的 `getAppAccessToken` 思路一致）。
+成功后会写入会话中的 **Access Token**；可在展开区查看完整 Token（请勿外泄）。
 
-- 可调用的换票地址：`POST https://open.teambition.com/api/appToken`  
-- 请勿在浏览器直接打开易跳转登录页的文档路径；程序侧使用 **`/api/appToken`**，请求头 `Authorization: Bearer <应用 JWT>`，Body：`{"appId","appSecret"}`。
+### 2. 企业与凭证
 
-成功后会写入会话中的 **Access Token**，页面可复制完整 Token。
-
-**备选**：也可在开放平台调试界面复制 Token，若你自行扩展界面支持手动粘贴，可写入会话使用（当前仓库以配置页暗号换票为主）。
-
-### 2. 企业 ID（Tenant）
-
-当前示例在代码中为 **固定企业 ID** 并写入会话；若你 fork 部署，请在 `app.py` 的 `config_page` 中改为自己的企业 ID，或改为从环境变量读取（需自行改代码）。
+各企业凭证在 `config_sidebar.py` 的 `COMPANY_PROFILES` 中配置；前台不渲染这些字段。
 
 ### 使用流程 (新菜单)
 
-1. **认证** 页：输入当日暗号 (YYYYMMDD) 获取 Token (或侧边栏手动配置 App ID/Secret)。
+1. **认证** 页：选择公司 → 输入暗号 → 获取 Token（凭证随所选企业自动写入会话，不在界面展示）。
 2. **数据中心** 页：
    - 操作面板：点击按钮拉取企业信息、项目、全部任务+阶段、工时。
    - 数据明细：选择项目查询详情 (使用动态 call)。

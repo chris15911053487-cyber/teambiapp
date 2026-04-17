@@ -14,7 +14,7 @@ from datetime import datetime
 from io import BytesIO
 from urllib.parse import urlencode
 from dotenv import load_dotenv
-from config_sidebar import get_app_token
+from config_sidebar import apply_company_to_session, get_app_token, COMPANY_PROFILES
 from streamlit_extras.card import card
 from streamlit_extras.metric_cards import style_metric_cards
 from streamlit_option_menu import option_menu
@@ -296,6 +296,14 @@ def init_session_state():
         st.session_state.worktime_data = None
     if "debug_mode" not in st.session_state:
         st.session_state.debug_mode = False
+    # 企业凭证：默认选中首个企业，并将 AppId/Secret/企业ID 写入 session（不在 UI 展示）
+    if COMPANY_PROFILES:
+        if (
+            "selected_company" not in st.session_state
+            or st.session_state.get("selected_company") not in COMPANY_PROFILES
+        ):
+            st.session_state.selected_company = next(iter(COMPANY_PROFILES))
+        apply_company_to_session(st.session_state.selected_company)
 
 
 class TeambitionAPI:
@@ -745,50 +753,69 @@ def app_menu():
 
 
 def auth_page():
-    """认证页面 (原配置页重构) - 输入暗号获取 Token，集成 config_sidebar"""
+    """认证页：选择企业（凭证仅服务端注入）→ 输入暗号换票；不展示 AppId/Secret/企业ID，不提示暗号规则。"""
     st.markdown('<h1 class="main-header">🔑 认证与 Token</h1>', unsafe_allow_html=True)
-    st.markdown("输入当日暗号 (YYYYMMDD) 获取 Access Token。App ID/Secret 可从侧边栏或环境变量配置。")
+    st.markdown("请先选择企业，再输入暗号完成换票。应用凭证不在页面展示。")
 
-    from config_sidebar import sidebar as config_sidebar_func
-    # Use sidebar logic for credentials (avoids hardcodes)
-    token_input, tenant_input = config_sidebar_func()
+    init_session_state()
 
-    # Dark号验证 (main flow)
-    st.subheader("暗号验证获取 Token")
-    with st.form(key='password_form'):
-        st.markdown("### 请输入当日暗号 (格式: YYYYMMDD)")
-        password = st.text_input("暗号", type="password", help="与服务器日期一致")
+    st.subheader("企业")
+    company_names = list(COMPANY_PROFILES.keys())
+    st.selectbox(
+        "选择公司",
+        company_names,
+        key="selected_company",
+        help="可选企业列表将随业务扩展；选中后自动绑定对应应用凭证。",
+        label_visibility="visible",
+    )
+    if st.session_state.get("selected_company") in COMPANY_PROFILES:
+        apply_company_to_session(st.session_state.selected_company)
+
+    st.subheader("暗号验证")
+    with st.form(key="password_form"):
+        st.markdown("### 请输入暗号")
+        passphrase = st.text_input(
+            "暗号",
+            type="password",
+            autocomplete="off",
+            label_visibility="visible",
+        )
         submit_button = st.form_submit_button("验证并获取 Token", type="primary")
-        
+
         if submit_button:
             import datetime
+
             today = datetime.datetime.now().strftime("%Y%m%d")
-            if password == today:
-                app_id = st.session_state.get('app_id', '69c9def37c12e5933cd9ca4f')  # fallback but prefer sidebar
-                app_secret = st.session_state.get('app_secret', 'x6FKGCHbRhc9rmZEMMzRHjVVNTNe6Vfo')
+            app_id = st.session_state.get("app_id")
+            app_secret = st.session_state.get("app_secret")
+            if not app_id or not app_secret:
+                st.error("请先选择企业。")
+            elif passphrase == today:
                 with st.spinner("获取 Token 中..."):
                     try:
                         token = get_app_token(app_id, app_secret)
-                        st.session_state['token'] = token
-                        st.success("✅ Token 获取成功! 可在侧边栏查看状态。")
-                        st.caption("完整 Access Token:")
-                        st.code(token, language=None)
+                        st.session_state["token"] = token
+                        st.success("✅ Token 获取成功。连接状态见左侧。")
+                        with st.expander("查看 Access Token（请勿外泄）", expanded=False):
+                            st.code(token, language=None)
                         st.rerun()
                     except Exception as e:
                         st.error(f"❌ 获取 Token 失败: {e}")
             else:
-                st.error("❌ 暗号错误，请输入今日日期 (YYYYMMDD)")
+                st.error("暗号错误，请重试。")
 
     st.markdown("---")
-    st.subheader("📊 当前认证状态")
+    st.subheader("📊 当前状态")
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("Access Token", "✅ 已配置" if st.session_state.get('token') else "❌ 未配置")
+        st.metric("Access Token", "✅ 已配置" if st.session_state.get("token") else "❌ 未配置")
     with col2:
-        tenant = st.session_state.get('tenant_id', tenant_input)
-        st.metric("企业 ID (Tenant)", tenant or "未配置")
+        st.metric(
+            "当前企业",
+            st.session_state.get("selected_company") or "未选择",
+        )
 
-    st.info("**推荐流程**: 使用侧边栏输入 App ID/Secret 点击获取，或手动输入 Token。暗号验证使用 config_sidebar 逻辑。")
+    st.caption("应用凭证与组织标识由所选企业自动绑定，不在界面显示。")
 
     style_metric_cards(
         background_color="#1e293b",

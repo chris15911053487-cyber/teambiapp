@@ -16,6 +16,26 @@ import streamlit as st
 OPEN_API_BASE = "https://open.teambition.com/api"
 APP_TOKEN_PATH = "/appToken"
 
+# 企业应用凭证（仅 Python 侧使用，界面不展示 AppId / Secret / 企业ID 明文）
+COMPANY_PROFILES = {
+    "上海麦汇信息科技有限公司": {
+        "app_id": "69c9def37c12e5933cd9ca4f",
+        "app_secret": "x6FKGCHbRhc9rmZEMMzRHjVVNTNe6Vfo",
+        "tenant_id": "5e2558954f68db000132597c",
+    },
+}
+
+
+def apply_company_to_session(company_name: str) -> None:
+    """根据所选企业将凭证写入 session_state（不在页面渲染这些字段）。"""
+    if company_name not in COMPANY_PROFILES:
+        return
+    profile = COMPANY_PROFILES[company_name]
+    st.session_state["app_id"] = profile["app_id"]
+    st.session_state["app_secret"] = profile["app_secret"]
+    st.session_state["tenant_id"] = profile["tenant_id"]
+    st.session_state["selected_company"] = company_name
+
 
 def sign_app_access_jwt(app_id: str, app_secret: str, periodical: int = 3600) -> str:
     """
@@ -89,72 +109,5 @@ def get_app_token(app_id: str, app_secret: str) -> str:
 
 
 def sidebar():
-    """侧边栏配置"""
-    st.sidebar.title("⚙️ 配置")
-
-    # 应用凭证配置
-    st.sidebar.subheader("🔑 应用凭证")
-
-    app_id = st.sidebar.text_input(
-        "App ID",
-        value=st.session_state.get('app_id', ''),
-        help="Teambition 应用的 App ID"
-    )
-
-    app_secret = st.sidebar.text_input(
-        "App Secret",
-        value=st.session_state.get('app_secret', ''),
-        help="Teambition 应用的 App Secret",
-        type="password"
-    )
-
-    # 保存到 session
-    st.session_state['app_id'] = app_id
-    st.session_state['app_secret'] = app_secret
-
-    # 获取 Token 按钮
-    if st.sidebar.button("🔄 获取 Token", use_container_width=True):
-        with st.spinner("获取 Token 中..."):
-            try:
-                token = get_app_token(app_id, app_secret)
-                st.session_state['token'] = token
-                st.sidebar.success("✅ Token 获取成功!")
-                st.sidebar.caption("完整 Access Token（可复制）：")
-                st.sidebar.code(token, language=None)
-            except Exception as e:
-                st.sidebar.error(f"❌ 错误: {e}")
-
-    st.sidebar.markdown("---")
-
-    # Token 输入（可以手动输入或自动获取）
-    token = st.sidebar.text_input(
-        "Access Token (可选)",
-        value=st.session_state.get('token', ''),
-        help="自动获取失败时可手动输入",
-        type="password"
-    )
-
-    # 企业 ID 输入
-    tenant_id = st.sidebar.text_input(
-        "企业 ID (Tenant ID)",
-        value=st.session_state.get('tenant_id', ''),
-        help="企业/组织的唯一标识"
-    )
-
-    # 保存到 session
-    st.session_state['token'] = token
-    st.session_state['tenant_id'] = tenant_id
-
-    # 使用说明
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("""
-    ### 📖 使用说明
-
-    **方式一（推荐）**: 输入 App ID 和 App Secret，点击"获取 Token"
-
-    **方式二**: 手动从开放平台复制 Token 粘贴
-
-    **Token 有效期**: 以接口返回为准（应用 JWT 建议按文档约 1 小时轮换）
-    """)
-
-    return token, tenant_id
+    """侧栏不再展示应用凭证；凭证在「认证」页通过企业下拉注入。保留函数供兼容。"""
+    return st.session_state.get("token", ""), st.session_state.get("tenant_id", "")
