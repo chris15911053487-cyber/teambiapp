@@ -14,9 +14,10 @@
 - **工时汇总**：在已有任务数据的基础上，按任务拉取工时聚合
 - **导出 Excel**：多 Sheet 导出（企业、项目、各项目任务、工时、阶段信息等）
 - **权限友好**：增强错误提示，明确指出需要开启的权限（`tb-core:project.stage:list` 等）
+- **API 请求调试**：侧边栏可开启「显示 API 请求报文」，在「任务」页查看每次发往 Teambition 的 URL、Headers（`Authorization` 脱敏）、Query 参数及响应状态，便于与开放平台调试器对照排查权限与租户问题
 - **Docker**：支持容器化部署
 
-**核心解决**：之前「给了权限仍提示没有权限」的问题，现在有专门页面和详细指引。
+**核心解决**：之前「给了权限仍提示没有权限」的问题，现在有专门页面和详细指引；配合请求报文可快速核对 `X-Tenant-Id`、项目 ID、换票后的 Token 是否一致。
 
 ---
 
@@ -34,7 +35,13 @@
 
 侧边栏底部会显示 **Token / 企业 ID** 是否已配置。
 
-**重要**：**任务页面** 专门优化了权限问题，如果遇到「没有权限」，请重点检查开放平台应用权限配置。
+其下 **调试工具** 区域：
+
+| 开关 | 说明 |
+|------|------|
+| **显示 API 请求报文** | 开启后，每次通过 `TeambitionAPI._request` 调用开放平台接口时，会记录最近约 20 条请求；在 **「任务」** 页顶部以折叠面板展示每条请求的完整 URL、Headers（Bearer Token 仅显示前缀以保安全）、Query 参数、业务 `code` / 错误信息。可一键清空记录。 |
+
+**重要**：**任务页面** 专门优化了权限问题，如果遇到「没有权限」，请重点检查开放平台应用权限配置；同时打开上述开关，将报文与 [开放平台](https://open.teambition.com) 调试页对比（应用 ID、租户 ID、路径与参数是否一致）。
 
 ### 数据页主区域标签
 
@@ -114,6 +121,20 @@ docker-compose up -d
 
 **权限问题解决**：如果接口返回权限错误，页面会给出具体指引，重点检查开放平台 → 你的应用 → 权限设置。
 
+### 4. 查看发往 Teambition 的请求报文（可选）
+
+排查「调试器里成功、本应用里 403」等问题时：
+
+1. 在侧边栏打开 **「显示 API 请求报文」**。
+2. 进入 **「任务」** 页，执行一次「拉取全部项目任务和阶段」或「单个项目快速查询」。
+3. 在页面顶部 **「API 请求记录」** 中展开条目，核对：
+   - 完整 URL 是否与文档一致（如 `/api/v3/project/{projectId}/stage/search`）；
+   - `X-Tenant-Id`、`X-Tenant-type` 是否与预期企业一致；
+   - Query 中的 `projectId`、`pageSize`、`pageToken` 等；
+   - 响应中的 `code` 与 `errorMessage`（与开放平台返回对照）。
+
+说明：记录中的 `Authorization` 为脱敏显示；完整 Token 仍可在「配置」页复制。会话内最多保留约 20 条，刷新页面或清空记录可重置。
+
 ---
 
 ## 技术说明
@@ -122,6 +143,7 @@ docker-compose up -d
 - **任务查询**：新增 `search_project_stages()`（`/v3/project/{projectId}/stage/search`）和 `query_tasks()`（支持 `/v3/project/{projectId}/task/query` 或全局 `/v3/task/query`）。
   - 自动获取阶段信息并映射到任务的 `stageName`。
   - 增强 `_request()` 方法，提供详细的权限错误诊断（code 403、10133、authorization 等）。
+  - 当 `st.session_state.debug_mode` 为真时，`_request` 会写入 `st.session_state.api_requests`（最近约 20 条），供「任务」页展示；`Authorization` 在展示时脱敏。
 - **新增「任务」菜单**：独立页面，专注任务+阶段查询，解决常见「已授权但提示无权限」问题。
 - **Excel**：使用 `pandas` + `openpyxl` 多 Sheet 导出（新增阶段信息 sheet）。
 

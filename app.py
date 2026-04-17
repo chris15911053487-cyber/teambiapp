@@ -84,18 +84,56 @@ class TeambitionAPI:
         }
     
     def _request(self, method: str, endpoint: str, **kwargs):
-        """统一请求方法，增强权限错误提示"""
+        """统一请求方法，增强权限错误提示 + 可选请求报文记录"""
         url = f"{self.BASE_URL}{endpoint}"
         headers = self._get_headers()
 
         if "headers" in kwargs:
             headers.update(kwargs.pop("headers"))
 
+        # 记录请求报文（调试模式）
+        if st.session_state.get("debug_mode"):
+            import datetime
+            timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+            params = kwargs.get("params", {})
+
+            # 脱敏 Authorization（只显示前20字符）
+            display_headers = headers.copy()
+            if "Authorization" in display_headers:
+                auth = display_headers["Authorization"]
+                display_headers["Authorization"] = auth[:20] + "..." if len(auth) > 20 else auth
+
+            request_log = {
+                "timestamp": timestamp,
+                "method": method,
+                "endpoint": endpoint,
+                "full_url": url,
+                "headers": display_headers,
+                "params": params,
+                "status": "pending"
+            }
+
+            if 'api_requests' not in st.session_state:
+                st.session_state.api_requests = []
+            st.session_state.api_requests.insert(0, request_log)
+            # 保留最近20条
+            if len(st.session_state.api_requests) > 20:
+                st.session_state.api_requests = st.session_state.api_requests[:20]
+
         response = requests.request(method, url, headers=headers, **kwargs)
         result = response.json()
 
         code = result.get("code")
         error_message = result.get("errorMessage", "")
+
+        # 更新最后一条请求的状态（调试模式）
+        if st.session_state.get("debug_mode") and st.session_state.get("api_requests"):
+            last_request = st.session_state.api_requests[0]
+            last_request["status"] = code or response.status_code
+            last_request["response_code"] = code
+            last_request["error_message"] = error_message
+            if "result" in result:
+                last_request["response_summary"] = f"{len(str(result.get('result', '')))} chars"
 
         if code is not None and code not in [0, 200]:
             # 增强权限错误提示
@@ -326,6 +364,12 @@ def app_menu():
         has_token = "已配置" if st.session_state.get("token") else "未配置"
         has_tenant = "已填写" if st.session_state.get("tenant_id") else "未填写"
         st.markdown(f"**Token**：{has_token}  \n**企业 ID**：{has_tenant}")
+
+        st.markdown("---")
+        st.caption("调试工具")
+        debug_mode = st.toggle("🪲 显示API请求报文", value=False, key="debug_mode")
+        if debug_mode and 'api_requests' not in st.session_state:
+            st.session_state.api_requests = []
 
     return selected
 
@@ -765,6 +809,10 @@ def main_page():
         st.session_state.tasks_data = {}
     if 'worktime_data' not in st.session_state:
         st.session_state.worktime_data = {}
+    if 'api_requests' not in st.session_state:
+        st.session_state.api_requests = []
+    if 'debug_mode' not in st.session_state:
+        st.session_state.debug_mode = False
     
     # 获取企业信息
     if fetch_org or fetch_all:
@@ -1129,6 +1177,27 @@ def tasks_page():
     if not client:
         st.warning("⚠️ 请先在「配置」中完成 Token 与企业 ID 配置。")
         return
+
+    # API 请求报文调试面板
+    if st.session_state.get("debug_mode") and st.session_state.get("api_requests"):
+        with st.expander("📡 API 请求记录 (最近20条，点击展开查看完整报文)", expanded=True):
+            for i, req in enumerate(st.session_state.api_requests[:8]):  # 显示最近8条
+                status_color = "🟢" if req.get("status") in (0, 200) else "🔴"
+                with st.expander(f"{status_color} {req['timestamp']} {req['method']} {req['endpoint']} (code: {req.get('response_code', req.get('status', 'N/A'))})", expanded=False):
+                    st.code(f"URL: {req['full_url']}", language="text")
+                    st.json({
+                        "headers": req["headers"],
+                        "params": req.get("params", {})
+                    })
+                    if "error_message" in req and req["error_message"]:
+                        st.error(f"错误: {req['error_message']}")
+                    if "response_summary" in req:
+                        st.info(f"响应摘要: {req['response_summary']}")
+            if len(st.session_state.api_requests) > 8:
+                st.caption(f"... 还有 {len(st.session_state.api_requests)-8} 条记录（可通过侧边栏开关控制）")
+            if st.button("🗑️ 清空请求记录"):
+                st.session_state.api_requests = []
+                st.rerun()
 
     # 操作按钮
     col1, col2 = st.columns(2)
