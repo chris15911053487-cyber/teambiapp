@@ -1418,11 +1418,21 @@ def display_data():
                 stages = data.get('stages', [])
                 stage_map = data.get('stage_map', {})
 
-                stage_info = f" | {len(stages)} 个阶段" if stages else ""
+                stage_rows = [s for s in (stages or []) if isinstance(s, dict)]
+                stage_info = f" | {len(stage_rows)} 个阶段" if stage_rows else ""
                 with st.expander(f"📂 {project_name} ({len(tasks)} 个任务{stage_info})"):
-                    if stages:
+                    if stage_rows:
                         st.markdown("**📍 项目阶段 (Kanban 列):**")
-                        stage_df = pd.DataFrame([{"阶段ID": s.get('id'), "阶段名称": s.get('name'), "tasklistId": s.get('tasklistId')} for s in stages])
+                        stage_df = pd.DataFrame(
+                            [
+                                {
+                                    "阶段ID": s.get("id"),
+                                    "阶段名称": s.get("name"),
+                                    "tasklistId": s.get("tasklistId"),
+                                }
+                                for s in stage_rows
+                            ]
+                        )
                         st.dataframe(stage_df, use_container_width=True, hide_index=True)
 
                     if tasks:
@@ -1913,9 +1923,28 @@ def data_center_page():
                 idx = project_options.index(selected_p)
                 proj = st.session_state.projects_data[idx]
                 try:
-                    stages = client.call("search_project_stages", project_id=proj['id'])
-                    tasks = client.call("query_tasks", project_id=proj['id'])
-                    st.session_state.tasks_data = {proj['id']: {'name': proj.get('name'), 'tasks': tasks, 'stages': stages}}
+                    # call() 默认返回完整响应；业务数据在 result，与 get_all_project_tasks 一致
+                    stages = client.call(
+                        "search_project_stages",
+                        project_id=proj["id"],
+                        extract_key="result",
+                    )
+                    tasks = client.call(
+                        "query_tasks",
+                        project_id=proj["id"],
+                        extract_key="result",
+                    )
+                    if not isinstance(stages, list):
+                        stages = []
+                    if not isinstance(tasks, list):
+                        tasks = []
+                    st.session_state.tasks_data = {
+                        proj["id"]: {
+                            "name": proj.get("name"),
+                            "tasks": tasks,
+                            "stages": stages,
+                        }
+                    }
                     st.success("查询完成")
                     display_data()
                 except Exception as e:
