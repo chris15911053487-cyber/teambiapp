@@ -27,14 +27,17 @@ COMPANY_PROFILES = {
 
 
 def apply_company_to_session(company_name: str) -> None:
-    """根据所选企业将凭证写入 session_state（不在页面渲染这些字段）。"""
+    """根据所选企业将凭证写入 session_state（不在页面渲染这些字段）。
+
+    注意：不得写入 ``selected_company``。该 key 由认证页 ``st.selectbox(..., key=\"selected_company\")``
+    独占；同一次运行中在控件实例化后再赋值会触发 StreamlitAPIException。
+    """
     if company_name not in COMPANY_PROFILES:
         return
     profile = COMPANY_PROFILES[company_name]
     st.session_state["app_id"] = profile["app_id"]
     st.session_state["app_secret"] = profile["app_secret"]
     st.session_state["tenant_id"] = profile["tenant_id"]
-    st.session_state["selected_company"] = company_name
 
 
 def sign_app_access_jwt(app_id: str, app_secret: str, periodical: int = 3600) -> str:
