@@ -335,23 +335,32 @@ API 权限错误: {error_message} (code: {code})
         return result.get("result", [])
 
     def query_tasks(self, project_id: str = None, stage_id: str = None, page_size: int = 50, page_token=None):
-        """通用任务查询接口。
-        - 使用 /v3/task/query (全局查询，可按 projectId 过滤)
-        - 或保持使用项目专属 /v3/project/{projectId}/task/query
+        """通用任务查询接口（已按官方文档调整参数结构）。
+        根据 https://open.teambition.com/docs/apis/6321c6d2912d20d3b5a4a7b8 文档：
+        - 项目专属接口：/v3/project/{projectId}/task/query （推荐，权限更窄）
+        - 全局接口：/v3/task/query 需要使用 filter 对象传递 projectId/stageId 等过滤条件
         """
-        params = {"pageSize": page_size}
-        if page_token:
-            params["pageToken"] = page_token
         if project_id:
-            params["projectId"] = project_id
-        if stage_id:
-            params["stageId"] = stage_id
-
-        if project_id:
-            # 优先使用项目专属接口（更高效，权限更明确）
+            # 优先使用项目专属接口（更高效，所需权限更明确）
             endpoint = f"/v3/project/{project_id}/task/query"
+            params = {"pageSize": page_size}
+            if page_token:
+                params["pageToken"] = page_token
+            # 项目专属接口通常支持顶层 projectId/stageId（但此处已通过路径传递）
         else:
+            # 全局 /v3/task/query 按文档要求使用 filter 参数
             endpoint = "/v3/task/query"
+            params = {"pageSize": page_size}
+            if page_token:
+                params["pageToken"] = page_token
+
+            filter_dict = {}
+            if project_id:
+                filter_dict["projectId"] = project_id
+            if stage_id:
+                filter_dict["stageId"] = stage_id
+            if filter_dict:
+                params["filter"] = json.dumps(filter_dict)  # GET 时序列化为字符串
 
         result = self._request("GET", endpoint, params=params)
         return result.get("result", []), self.project_query_next_token(result)

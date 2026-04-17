@@ -141,10 +141,11 @@ docker-compose up -d
 ## 技术说明
 
 - **项目分页**：Open API v3 的 `/v3/project/query` 使用 **游标分页** (`pageToken`/`nextPageToken`)。
-- **任务查询**：新增 `search_project_stages()`（`/v3/project/{projectId}/stage/search`）和 `query_tasks()`（支持 `/v3/project/{projectId}/task/query` 或全局 `/v3/task/query`）。
+- **任务查询**：新增 `search_project_stages()`（`/v3/project/{projectId}/stage/search`）和 `query_tasks()`（已按官方文档 https://open.teambition.com/docs/apis/6321c6d2912d20d3b5a4a7b8 优化）。
+  - **优先使用项目专属接口** `/v3/project/{projectId}/task/query`（更稳定，权限要求较低）。
+  - 全局 `/v3/task/query` 现在正确使用 `filter` 参数（JSON 序列化后作为 query string），解决之前「Invalid parameter」问题。
   - 自动获取阶段信息并映射到任务的 `stageName`。
-  - 增强 `_request()` 方法，提供详细的权限错误诊断（code 403、10133、authorization 等）。
-  - 当 `st.session_state.debug_mode` 为真时，`_request` 会写入 `st.session_state.api_requests`（最近约 20 条），含 `headers_full`、响应 JSON、`http_status`；「任务」页提供 `format_api_debug_bundle` + 浏览器剪贴板一键复制及 cURL 生成。
+  - 增强 `_request()` + 调试面板（一键复制含完整 Token 的 cURL，便于 Postman 导入）。
 - **新增「任务」菜单**：独立页面，专注任务+阶段查询，解决常见「已授权但提示无权限」问题。
 - **Excel**：使用 `pandas` + `openpyxl` 多 Sheet 导出（新增阶段信息 sheet）。
 
