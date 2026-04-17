@@ -300,7 +300,11 @@ API 权限错误: {error_message} (code: {code})
         return all_projects
     
     def get_project_tasks(self, project_id: str, page_size: int = 50):
-        """获取项目任务（游标分页，与查询项目一致）。"""
+        """获取某项目下任务列表（游标分页）。
+
+        使用 ``GET /v3/project/{projectId}/task/query``，与开放平台文档中
+        「查询任务详情」的 ``GET /v3/task/query`` 为不同接口；后者用于按已知 taskId 查详情。
+        """
         all_tasks = []
         page_token = None
         prev_first_id = None
@@ -1299,9 +1303,13 @@ def tasks_page():
     """专用任务查询页面 - 聚焦于按项目/阶段查询任务"""
     st.markdown('<h1 class="main-header">📋 任务查询</h1>', unsafe_allow_html=True)
     st.markdown("""
-    使用官方推荐接口：
+    本页「拉取项目任务」使用 **项目作用域** 接口（路径里含项目 ID），与文档中心 **「查询任务详情」** 那条 **不同**：
+    - 文档 [查询任务详情](https://open.teambition.com/docs/apis/6321c6d2912d20d3b5a4a7b8)：`GET /api/v3/task/query`（无 projectId，按 taskId 等查详情）
+    - 本页拉列表：`GET /api/v3/project/{projectId}/task/query`（分页拉取该项目下任务）
+
+    流程：
     1. `/v3/project/{projectId}/stage/search` 获取项目**阶段**（Kanban 列）
-    2. `/v3/project/{projectId}/task/query` 获取该项目下的**所有任务**
+    2. `/v3/project/{projectId}/task/query` 获取该项目下的**全部任务**（游标分页）
 
     **权限提示**：如果仍提示「没有权限」，请在 [Teambition 开放平台](https://open.teambition.com) 的应用设置中开启：
     - `tb-core:project.stage:list`（项目自定义列表查看权限）

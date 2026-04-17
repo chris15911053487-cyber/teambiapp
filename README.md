@@ -7,8 +7,8 @@
 - **企业信息**：查看企业名称、组织 ID、创建时间等
 - **项目列表**：支持游标分页（`pageToken` / `nextPageToken`）
 - **任务查询**（**重点增强**）：新增独立「任务」菜单
-  - 先调用 `/v3/project/{projectId}/stage/search` 获取**阶段/任务列表**（Kanban 列）
-  - 再调用 `/v3/project/{projectId}/task/query` 获取完整任务
+  - 先调用 `/v3/project/{projectId}/stage/search` 获取**阶段**（Kanban 列）
+  - 再调用 `/v3/project/{projectId}/task/query` 拉取该项目下**任务列表**（与开放平台文档里「查询任务详情」的 URL **不是同一条**，见下「两条任务接口」）
   - 支持单个项目查询 + 全部项目批量查询
   - 自动关联阶段名称，提升数据可读性
 - **工时汇总**：在已有任务数据的基础上，按任务拉取工时聚合
@@ -140,9 +140,27 @@ docker-compose up -d
 
 ## 技术说明
 
+### 两条「任务」相关 API（不要混淆）
+
+开放平台文档里的 **[查询任务详情](https://open.teambition.com/docs/apis/6321c6d2912d20d3b5a4a7b8)** 对应：
+
+- **URL**：`https://open.teambition.com/api/v3/task/query`（路径中**没有** `projectId`）
+- **用途**：按 `taskId` / `shortIds` / `parentTaskId` 查询**已知任务**的详情；权限 `tb-core:task:get`
+- **代码**：`TeambitionAPI.query_tasks()` 在未传 `project_id` 且传入上述 ID 参数时调用
+
+本工具在「按项目拉全量任务」时使用的是**另一条**项目作用域接口（文档中心里另有说明，路径形如）：
+
+- **URL**：`https://open.teambition.com/api/v3/project/{projectId}/task/query`
+- **用途**：在指定项目内**分页列举任务**；权限常见为 `tb-core:project.task:list`
+- **代码**：`get_project_tasks()`、`query_tasks(project_id=...)`、`get_all_project_tasks()`
+
+二者并存：前者对应截图/文档首页的「查询任务详情」；后者用于本项目里「选一个项目 → 同步该项目下所有任务」。
+
+---
+
 - **项目分页**：Open API v3 的 `/v3/project/query` 使用 **游标分页** (`pageToken`/`nextPageToken`)。
-- **任务查询**：新增 `search_project_stages()`（`/v3/project/{projectId}/stage/search`）和 `query_tasks()`。
-  - **项目列表**：`/v3/project/{projectId}/task/query` 使用 `pageSize` / `pageToken` 拉取该项目下任务（与 `get_project_tasks()` 一致）。
+- **任务查询**：`search_project_stages()`（`/v3/project/{projectId}/stage/search`）和 `query_tasks()` / `get_project_tasks()`。
+  - **项目下列表**：`/v3/project/{projectId}/task/query` 使用 `pageSize` / `pageToken`（与 `get_project_tasks()` 一致）。
   - **全局按 ID 查询** `/v3/task/query` 以[官方文档](https://open.teambition.com/docs/apis/6321c6d2912d20d3b5a4a7b8)为准：query 为 `taskId`、`shortIds`、`parentTaskId`（`taskId` 与 `parentTaskId` 二选一），**不是** `filter` / `pageSize`。
   - 自动获取阶段信息并映射到任务的 `stageName`。
   - 增强 `_request()` + 调试面板（一键复制含完整 Token 的 cURL，便于 Postman 导入）。
