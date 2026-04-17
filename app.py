@@ -815,6 +815,15 @@ def app_menu():
         has_tenant = "已填写" if st.session_state.get("tenant_id") else "未填写"
         st.markdown(f"**Token**：{has_token}  \n**企业 ID**：{has_tenant}")
 
+        # 调试开关放在侧栏且每页都渲染，避免仅在「API记录」页挂载导致切换菜单后状态被清空
+        st.markdown("---")
+        st.caption("API 调试")
+        st.toggle(
+            "🪲 记录 API 请求",
+            key="debug_mode",
+            help="开启后，所有 TeambitionAPI 调用会写入「API记录」页（保留最近 20 条）。切换页面后仍保持此开关状态。",
+        )
+
     return selected
 
 
@@ -1987,13 +1996,15 @@ def api_records_page():
     st.markdown("所有通过 TeambitionAPI 发出的请求记录在此 (含请求/响应/cURL)。")
 
     init_session_state()
-    # 与 _request 中 debug_mode 一致；开关比按钮更易发现
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.toggle("🪲 启用调试模式（记录 API 请求报文）", key="debug_mode")
-    st.markdown("</div>", unsafe_allow_html=True)
 
     if not st.session_state.get("api_requests"):
-        st.info("暂无记录。打开上方开关后，在「数据中心」等页面发起请求，将自动记录在此。")
+        if st.session_state.get("debug_mode"):
+            st.info("调试模式已开启，当前尚无记录。请在「数据中心」等页面发起 API 调用，返回本页即可查看。")
+        else:
+            st.info(
+                "请先在**左侧边栏**「API 调试」中打开 **🪲 记录 API 请求**，再到「数据中心」等页面操作；"
+                "开关会一直保持，切换页面不会关闭。"
+            )
         return
 
     # Filters
