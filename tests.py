@@ -65,6 +65,26 @@ class TestTeambitionAPI(unittest.TestCase):
 
     @patch('app.requests.request')
     @patch('app.st.session_state')
+    def test_call_search_project_stages_no_duplicate_project_in_query(self, mock_session, mock_request):
+        """stage/search：projectId 仅在路径中，query 不应重复 projectId / project_id。"""
+        mock_session.get.return_value = DEFAULT_API_CONFIGS
+        mock_response = Mock()
+        mock_response.json.return_value = {"code": 200, "result": []}
+        mock_request.return_value = mock_response
+
+        pid = "69dda1ad6cb8d6136c5720e7"
+        self.api.call("search_project_stages", project_id=pid)
+
+        mock_request.assert_called_once()
+        args, kwargs = mock_request.call_args
+        self.assertEqual(
+            args[1],
+            f"https://open.teambition.com/api/v3/project/{pid}/stage/search",
+        )
+        self.assertEqual(kwargs.get("params"), {"pageSize": 50})
+
+    @patch('app.requests.request')
+    @patch('app.st.session_state')
     def test_get_org_info(self, mock_session, mock_request):
         """测试获取企业信息 (新 dynamic path)"""
         mock_session.get.return_value = DEFAULT_API_CONFIGS  # mock configs

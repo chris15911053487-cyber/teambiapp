@@ -6,6 +6,7 @@ Teambition API Web 应用
 """
 
 import json
+import re
 import streamlit as st
 import pandas as pd
 import requests
@@ -253,6 +254,44 @@ DEFAULT_API_CONFIGS = [
         "pagination": False
     },
 ]
+
+
+def _camel_to_snake(name: str) -> str:
+    """projectId -> project_id（用于路径占位符与 query 别名的统一剥离）。"""
+    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", name).lower()
+
+
+def _merge_snake_to_camel_for_path(context: dict) -> dict:
+    """resolve_endpoint 按 key 替换 {{projectId}}；调用侧常传 project_id，需补全 camelCase。"""
+    ctx = dict(context)
+    if ctx.get("project_id") is not None and "projectId" not in ctx:
+        ctx["projectId"] = ctx["project_id"]
+    if ctx.get("task_id") is not None and "taskId" not in ctx:
+        ctx["taskId"] = ctx["task_id"]
+    return ctx
+
+
+def _strip_query_params_bound_to_path_template(endpoint_template: str, params: dict) -> None:
+    """路径中已使用 {{projectId}} 等占位符时，不应再作为 GET query 重复提交。"""
+    for raw in re.findall(r"\{([^}]+)\}", endpoint_template):
+        keys = {raw}
+        snake = _camel_to_snake(raw)
+        if snake != raw:
+            keys.add(snake)
+        for k in keys:
+            params.pop(k, None)
+
+
+def _dedupe_camel_snake_query_aliases(params: dict) -> None:
+    """同一语义只保留 Teambition 常用的 camelCase query 键。"""
+    for camel, snake in (
+        ("projectId", "project_id"),
+        ("taskId", "task_id"),
+        ("pageToken", "page_token"),
+    ):
+        if camel in params and snake in params:
+            del params[snake]
+
 
 # Resolver 函数注册表 - 动态解析参数
 def resolve_param(resolver_name: str, context: dict, api_config: dict = None):
@@ -644,19 +683,26 @@ API 权限错误: {error_message} (code: {code})
         """
         config = self.get_config(name)
         method = config["method"]
-        endpoint = self.resolve_endpoint(config["endpoint"], context)
+        path_ctx = _merge_snake_to_camel_for_path(context)
+        endpoint = self.resolve_endpoint(config["endpoint"], path_ctx)
 
         # 构建参数 (default + resolved + context override)
         params_or_body = config.get("default_params", {}).copy()
         for param_name, resolver_name in config.get("resolvers", {}).items():
-            value = resolve_param(resolver_name, {**context, "api_name": name}, config)
+            value = resolve_param(resolver_name, {**path_ctx, "api_name": name}, config)
             if value is not None:
                 params_or_body[param_name] = value
 
-        # Context 覆盖 (优先级最高)
+        # Context 覆盖 (优先级最高)；不传内部键到 HTTP query/body
+        _internal_ctx_keys = frozenset({"api_name", "extract_key"})
         for k, v in context.items():
-            if k not in ["api_name"]:  # 内部键
-                params_or_body[k] = v
+            if k in _internal_ctx_keys:
+                continue
+            params_or_body[k] = v
+
+        if method.upper() == "GET":
+            _dedupe_camel_snake_query_aliases(params_or_body)
+            _strip_query_params_bound_to_path_template(config["endpoint"], params_or_body)
 
         # 调用 (GET 用 params, 其他用 json body)
         kwargs = {"params": params_or_body} if method.upper() == "GET" else {"json": params_or_body}
