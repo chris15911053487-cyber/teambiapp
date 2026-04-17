@@ -302,18 +302,21 @@ API 权限错误: {error_message} (code: {code})
     def get_project_tasks(self, project_id: str, page_size: int = 50):
         """获取某项目下任务列表（游标分页）。
 
-        使用 ``GET /v3/project/{projectId}/task/query``，与开放平台文档中
-        「查询任务详情」的 ``GET /v3/task/query`` 为不同接口；后者用于按已知 taskId 查详情。
+        统一使用开放平台 ``GET /v3/task/query``，query 中通过 ``filter`` JSON 传入
+        ``projectId``，并配合 ``pageSize`` / ``pageToken`` 分页。
         """
         all_tasks = []
         page_token = None
         prev_first_id = None
 
         while True:
-            params = {"pageSize": page_size}
+            params = {
+                "pageSize": page_size,
+                "filter": json.dumps({"projectId": project_id}),
+            }
             if page_token:
                 params["pageToken"] = page_token
-            result = self._request("GET", f"/v3/project/{project_id}/task/query", params=params)
+            result = self._request("GET", "/v3/task/query", params=params)
             tasks = result.get("result") or []
             if tasks:
                 first_id = tasks[0].get("id")
@@ -352,32 +355,38 @@ API 权限错误: {error_message} (code: {code})
         page_size: int = 50,
         page_token=None,
         *,
+        stage_id: str = None,
         task_ids=None,
         short_ids=None,
         parent_task_id: str = None,
         operator_id: str = None,
     ):
-        """任务查询。
+        """任务查询（统一 ``GET /v3/task/query``）。
 
-        - **项目下列表**：``GET /v3/project/{projectId}/task/query``，使用 ``pageSize`` / ``pageToken``
-          游标分页（与项目列表等接口一致；权限常见为 ``tb-core:project.task:list``）。
-        - **全局按 ID 查任务详情**：``GET /v3/task/query``，见
+        - **按项目分页列表**：query 使用 ``filter``（JSON 字符串）包含 ``projectId``，可选
+          ``stageId``，以及 ``pageSize`` / ``pageToken``。
+        - **按已知任务 ID 查详情**：见
           https://open.teambition.com/docs/apis/6321c6d2912d20d3b5a4a7b8
-          —— query 仅含 ``taskId``、``shortIds``、``parentTaskId``（``taskId`` 与 ``parentTaskId``
-          二选一），**无** ``pageSize`` / ``filter``；权限为 ``tb-core:task:get``。
-          可选请求头 ``x-operator-id``（``operator_id``）表示查询人，会按该成员可见范围过滤。
+          —— ``taskId``、``shortIds``、``parentTaskId``（``taskId`` 与 ``parentTaskId`` 二选一），
+          不与 ``filter`` 混用。
+        可选请求头 ``x-operator-id``（``operator_id``）。
         """
         extra_headers = {"x-operator-id": operator_id} if operator_id else None
 
         if project_id:
-            endpoint = f"/v3/project/{project_id}/task/query"
-            params = {"pageSize": page_size}
+            filter_obj = {"projectId": project_id}
+            if stage_id:
+                filter_obj["stageId"] = stage_id
+            params = {
+                "pageSize": page_size,
+                "filter": json.dumps(filter_obj),
+            }
             if page_token:
                 params["pageToken"] = page_token
             req_kwargs = {"params": params}
             if extra_headers:
                 req_kwargs["headers"] = extra_headers
-            result = self._request("GET", endpoint, **req_kwargs)
+            result = self._request("GET", "/v3/task/query", **req_kwargs)
             return result.get("result", []), self.project_query_next_token(result)
 
         tid = self._comma_separated_ids(task_ids)
@@ -387,7 +396,7 @@ API 权限错误: {error_message} (code: {code})
         if not tid and not sid and not parent_task_id:
             raise ValueError(
                 "全局 /v3/task/query 须提供 task_ids、short_ids 或 parent_task_id 之一；"
-                "拉取某项目下全部任务请传入 project_id 使用 /v3/project/{projectId}/task/query"
+                "拉取某项目下全部任务请传入 project_id（将使用 filter.projectId 分页）"
             )
 
         params = {}
@@ -1303,13 +1312,13 @@ def tasks_page():
     """专用任务查询页面 - 聚焦于按项目/阶段查询任务"""
     st.markdown('<h1 class="main-header">📋 任务查询</h1>', unsafe_allow_html=True)
     st.markdown("""
-    本页「拉取项目任务」使用 **项目作用域** 接口（路径里含项目 ID），与文档中心 **「查询任务详情」** 那条 **不同**：
-    - 文档 [查询任务详情](https://open.teambition.com/docs/apis/6321c6d2912d20d3b5a4a7b8)：`GET /api/v3/task/query`（无 projectId，按 taskId 等查详情）
-    - 本页拉列表：`GET /api/v3/project/{projectId}/task/query`（分页拉取该项目下任务）
+    任务数据统一走开放平台 **`GET /api/v3/task/query`**（与[查询任务详情](https://open.teambition.com/docs/apis/6321c6d2912d20d3b5a4a7b8)同一路径）：
+    - **拉取某项目下全部任务**：query 中带 `filter`（JSON，内含 `projectId`）+ `pageSize` / `pageToken` 分页
+    - **按任务 ID 查详情**：query 中带 `taskId` / `shortIds` / `parentTaskId`（见文档）
 
     流程：
     1. `/v3/project/{projectId}/stage/search` 获取项目**阶段**（Kanban 列）
-    2. `/v3/project/{projectId}/task/query` 获取该项目下的**全部任务**（游标分页）
+    2. `GET /v3/task/query` + `filter.projectId` 获取该项目下的**全部任务**（游标分页）
 
     **权限提示**：如果仍提示「没有权限」，请在 [Teambition 开放平台](https://open.teambition.com) 的应用设置中开启：
     - `tb-core:project.stage:list`（项目自定义列表查看权限）

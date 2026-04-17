@@ -124,8 +124,12 @@ class TestTeambitionAPI(unittest.TestCase):
         result = self.api.get_project_tasks("project_123", page_size=20)
 
         self.assertEqual(result, [{"id": "1", "name": "Task 1"}])
-        mock_request.assert_called_with("GET", "https://open.teambition.com/api/v3/project/project_123/task/query",
-                                      headers=self.api._get_headers(), params={"pageSize": 20})
+        mock_request.assert_called_with(
+            "GET",
+            "https://open.teambition.com/api/v3/task/query",
+            headers=self.api._get_headers(),
+            params={"pageSize": 20, "filter": '{"projectId": "project_123"}'},
+        )
 
     @patch('app.requests.request')
     def test_query_tasks_global_by_task_ids(self, mock_request):
