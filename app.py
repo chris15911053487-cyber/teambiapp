@@ -5,11 +5,14 @@ Teambition API Web 应用
 使用 Streamlit 构建图形界面
 """
 
+import json
 import streamlit as st
 import pandas as pd
 import requests
+import streamlit.components.v1 as components
 from datetime import datetime
 from io import BytesIO
+from urllib.parse import urlencode
 from dotenv import load_dotenv
 from config_sidebar import get_app_token
 from streamlit_extras.card import card
@@ -18,6 +21,88 @@ from streamlit_option_menu import option_menu
 
 # 加载环境变量
 load_dotenv()
+
+
+def _build_curl_from_request(req: dict) -> str:
+    """生成可粘贴到 Postman（Import > Raw text）的 cURL。"""
+    method = req.get("method", "GET")
+    full_h = req.get("headers_full") or req.get("headers") or {}
+    params = req.get("params") or {}
+    base = req.get("full_url", "")
+    if params:
+        q = urlencode(params)
+        sep = "&" if "?" in base else "?"
+        url = f"{base}{sep}{q}"
+    else:
+        url = base
+    lines = [f"curl -sS -X {method}"]
+    for k, v in full_h.items():
+        val = str(v).replace("'", "'\\''")
+        lines.append(f"  -H '{k}: {val}'")
+    lines.append(f"  '{url}'")
+    return " \\\n".join(lines)
+
+
+def format_api_debug_bundle(req: dict) -> str:
+    """组装完整调试报文：请求/响应 + cURL，便于 Postman 与人工对照。"""
+    lines = [
+        "=== Teambition Open API 调试报文 ===",
+        f"时间: {req.get('timestamp', '')}",
+        "",
+        "--- HTTP 请求 ---",
+        f"{req.get('method', 'GET')} {req.get('full_url', '')}",
+        "",
+        "Headers:",
+    ]
+    full_h = req.get("headers_full") or req.get("headers") or {}
+    for k, v in full_h.items():
+        lines.append(f"  {k}: {v}")
+    lines.append("")
+    params = req.get("params") or {}
+    lines.append("Query 参数:")
+    if params:
+        for k, v in params.items():
+            lines.append(f"  {k}: {v}")
+    else:
+        lines.append("  (无)")
+    lines.extend(["", "--- HTTP 响应 ---"])
+    lines.append(f"HTTP 状态码: {req.get('http_status', 'N/A')}")
+    lines.append(f"业务 code: {req.get('response_code', req.get('status', 'N/A'))}")
+    if req.get("error_message"):
+        lines.append(f"errorMessage: {req['error_message']}")
+    lines.extend(["", "响应 JSON:"])
+    rj = req.get("response_json")
+    if rj is not None:
+        try:
+            lines.append(json.dumps(rj, ensure_ascii=False, indent=2))
+        except (TypeError, ValueError):
+            lines.append(str(rj))
+    else:
+        lines.append("(暂无)")
+    lines.extend(["", "--- cURL（Postman：Import → Raw text 粘贴下面整段）---", _build_curl_from_request(req)])
+    return "\n".join(lines)
+
+
+def render_copy_debug_bundle_button(bundle_text: str) -> None:
+    """浏览器剪贴板一键复制（无需服务器端 pyperclip）。"""
+    js_literal = json.dumps(bundle_text)
+    components.html(
+        f"""
+        <div style="font-family: system-ui, sans-serif;">
+            <button type="button"
+                style="padding: 0.35rem 0.75rem; cursor: pointer; border-radius: 6px;
+                border: 1px solid #2563eb; background: #eff6ff; color: #1e40af; font-size: 13px;"
+                onclick="navigator.clipboard.writeText({js_literal}).then(function() {{
+                    alert('已复制到剪贴板，可粘贴到 Postman（Import → Raw text）或记事本');
+                }}).catch(function() {{
+                    alert('复制失败，请改用下方「备用纯文本」全选复制');
+                }});"
+            >📋 一键复制完整报文</button>
+        </div>
+        """,
+        height=52,
+    )
+
 
 # 页面配置
 st.set_page_config(
@@ -109,8 +194,9 @@ class TeambitionAPI:
                 "endpoint": endpoint,
                 "full_url": url,
                 "headers": display_headers,
+                "headers_full": dict(headers),
                 "params": params,
-                "status": "pending"
+                "status": "pending",
             }
 
             if 'api_requests' not in st.session_state:
@@ -121,18 +207,23 @@ class TeambitionAPI:
                 st.session_state.api_requests = st.session_state.api_requests[:20]
 
         response = requests.request(method, url, headers=headers, **kwargs)
-        result = response.json()
+        try:
+            result = response.json()
+        except ValueError:
+            result = {"_parse_error": "响应非 JSON", "text": response.text[:2000]}
 
-        code = result.get("code")
-        error_message = result.get("errorMessage", "")
+        code = result.get("code") if isinstance(result, dict) else None
+        error_message = result.get("errorMessage", "") if isinstance(result, dict) else ""
 
         # 更新最后一条请求的状态（调试模式）
         if st.session_state.get("debug_mode") and st.session_state.get("api_requests"):
             last_request = st.session_state.api_requests[0]
-            last_request["status"] = code or response.status_code
+            last_request["http_status"] = response.status_code
+            last_request["status"] = code if code is not None else response.status_code
             last_request["response_code"] = code
             last_request["error_message"] = error_message
-            if "result" in result:
+            last_request["response_json"] = result if isinstance(result, dict) else {"_raw": str(result)}
+            if isinstance(result, dict) and "result" in result:
                 last_request["response_summary"] = f"{len(str(result.get('result', '')))} chars"
 
         if code is not None and code not in [0, 200]:
@@ -1180,22 +1271,38 @@ def tasks_page():
 
     # API 请求报文调试面板
     if st.session_state.get("debug_mode") and st.session_state.get("api_requests"):
-        with st.expander("📡 API 请求记录 (最近20条，点击展开查看完整报文)", expanded=True):
-            for i, req in enumerate(st.session_state.api_requests[:8]):  # 显示最近8条
-                status_color = "🟢" if req.get("status") in (0, 200) else "🔴"
-                with st.expander(f"{status_color} {req['timestamp']} {req['method']} {req['endpoint']} (code: {req.get('response_code', req.get('status', 'N/A'))})", expanded=False):
+        with st.expander("📡 API 请求记录 (最近20条；含一键复制，便于 Postman Raw text 导入)", expanded=True):
+            for i, req in enumerate(st.session_state.api_requests[:20]):
+                rc = req.get("response_code")
+                if req.get("status") == "pending":
+                    status_color = "🟡"
+                elif rc in (0, 200):
+                    status_color = "🟢"
+                else:
+                    status_color = "🔴"
+                rc_show = rc if rc is not None else req.get("status", "N/A")
+                title = f"{status_color} {req['timestamp']} {req['method']} {req['endpoint']} (业务code: {rc_show})"
+                with st.expander(title, expanded=False):
+                    bundle = format_api_debug_bundle(req)
+                    render_copy_debug_bundle_button(bundle)
+                    st.caption("备用：若浏览器拦截剪贴板，请展开下方文本框后 **Ctrl+A / Cmd+A** 全选复制。")
+                    st.text_area(
+                        "完整报文（纯文本）",
+                        value=bundle,
+                        height=220,
+                        key=f"api_dbg_txt_{i}_{req.get('timestamp', i)}",
+                        label_visibility="collapsed",
+                    )
                     st.code(f"URL: {req['full_url']}", language="text")
                     st.json({
-                        "headers": req["headers"],
-                        "params": req.get("params", {})
+                        "headers（界面脱敏）": req["headers"],
+                        "params": req.get("params", {}),
                     })
-                    if "error_message" in req and req["error_message"]:
+                    if req.get("error_message"):
                         st.error(f"错误: {req['error_message']}")
-                    if "response_summary" in req:
+                    if req.get("response_summary"):
                         st.info(f"响应摘要: {req['response_summary']}")
-            if len(st.session_state.api_requests) > 8:
-                st.caption(f"... 还有 {len(st.session_state.api_requests)-8} 条记录（可通过侧边栏开关控制）")
-            if st.button("🗑️ 清空请求记录"):
+            if st.button("🗑️ 清空请求记录", key="clear_api_requests_btn"):
                 st.session_state.api_requests = []
                 st.rerun()
 

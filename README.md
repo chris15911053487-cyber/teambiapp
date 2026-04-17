@@ -14,7 +14,7 @@
 - **工时汇总**：在已有任务数据的基础上，按任务拉取工时聚合
 - **导出 Excel**：多 Sheet 导出（企业、项目、各项目任务、工时、阶段信息等）
 - **权限友好**：增强错误提示，明确指出需要开启的权限（`tb-core:project.stage:list` 等）
-- **API 请求调试**：侧边栏可开启「显示 API 请求报文」，在「任务」页查看每次发往 Teambition 的 URL、Headers（`Authorization` 脱敏）、Query 参数及响应状态，便于与开放平台调试器对照排查权限与租户问题
+- **API 请求调试**：侧边栏可开启「显示 API 请求报文」，在「任务」页查看每次发往 Teambition 的 URL、Headers（界面展示为脱敏）、Query 参数及响应；每条记录支持 **一键复制完整报文**（含**未脱敏** Headers、响应 JSON 与 **cURL**），便于粘贴到 **Postman**（Import → Raw text）或记事本对照
 - **Docker**：支持容器化部署
 
 **核心解决**：之前「给了权限仍提示没有权限」的问题，现在有专门页面和详细指引；配合请求报文可快速核对 `X-Tenant-Id`、项目 ID、换票后的 Token 是否一致。
@@ -39,7 +39,7 @@
 
 | 开关 | 说明 |
 |------|------|
-| **显示 API 请求报文** | 开启后，每次通过 `TeambitionAPI._request` 调用开放平台接口时，会记录最近约 20 条请求；在 **「任务」** 页顶部以折叠面板展示每条请求的完整 URL、Headers（Bearer Token 仅显示前缀以保安全）、Query 参数、业务 `code` / 错误信息。可一键清空记录。 |
+| **显示 API 请求报文** | 开启后，每次通过 `TeambitionAPI._request` 调用开放平台接口时，会记录最近约 20 条请求；在 **「任务」** 页以折叠面板展示。界面中的 JSON 仍为 **脱敏** Headers；点击 **「一键复制完整报文」** 可复制含 **完整 Authorization**、响应体与 **cURL** 的纯文本（另提供文本框备用全选复制）。可一键清空记录。 |
 
 **重要**：**任务页面** 专门优化了权限问题，如果遇到「没有权限」，请重点检查开放平台应用权限配置；同时打开上述开关，将报文与 [开放平台](https://open.teambition.com) 调试页对比（应用 ID、租户 ID、路径与参数是否一致）。
 
@@ -132,8 +132,9 @@ docker-compose up -d
    - `X-Tenant-Id`、`X-Tenant-type` 是否与预期企业一致；
    - Query 中的 `projectId`、`pageSize`、`pageToken` 等；
    - 响应中的 `code` 与 `errorMessage`（与开放平台返回对照）。
+4. 点击 **「一键复制完整报文」**，将整段文本粘贴到 **Postman** → **Import** → **Raw text**（可识别其中的 **cURL**），或与开放平台调试结果逐字段对比。
 
-说明：记录中的 `Authorization` 为脱敏显示；完整 Token 仍可在「配置」页复制。会话内最多保留约 20 条，刷新页面或清空记录可重置。
+说明：列表里 JSON 展示的 `Authorization` 仍为脱敏；**一键复制内容含完整 Bearer Token**，请勿泄露。若浏览器拦截剪贴板 API，请用同一条目下的文本框 **Ctrl+A / Cmd+A** 全选复制。会话内最多保留约 20 条，刷新页面或清空记录可重置。
 
 ---
 
@@ -143,7 +144,7 @@ docker-compose up -d
 - **任务查询**：新增 `search_project_stages()`（`/v3/project/{projectId}/stage/search`）和 `query_tasks()`（支持 `/v3/project/{projectId}/task/query` 或全局 `/v3/task/query`）。
   - 自动获取阶段信息并映射到任务的 `stageName`。
   - 增强 `_request()` 方法，提供详细的权限错误诊断（code 403、10133、authorization 等）。
-  - 当 `st.session_state.debug_mode` 为真时，`_request` 会写入 `st.session_state.api_requests`（最近约 20 条），供「任务」页展示；`Authorization` 在展示时脱敏。
+  - 当 `st.session_state.debug_mode` 为真时，`_request` 会写入 `st.session_state.api_requests`（最近约 20 条），含 `headers_full`、响应 JSON、`http_status`；「任务」页提供 `format_api_debug_bundle` + 浏览器剪贴板一键复制及 cURL 生成。
 - **新增「任务」菜单**：独立页面，专注任务+阶段查询，解决常见「已授权但提示无权限」问题。
 - **Excel**：使用 `pandas` + `openpyxl` 多 Sheet 导出（新增阶段信息 sheet）。
 
