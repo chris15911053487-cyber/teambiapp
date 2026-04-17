@@ -12,7 +12,7 @@ import os
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app import TeambitionAPI, get_api_client, to_excel, DEFAULT_API_CONFIGS, _api_result_list
+from app import TeambitionAPI, get_api_client, to_excel, DEFAULT_API_CONFIGS, _api_result_list, resolve_param
 import pandas as pd
 
 
@@ -96,6 +96,14 @@ class TestTeambitionAPI(unittest.TestCase):
 
         self.assertEqual(result, {"code": 200, "result": {"name": "Test Org"}})
         mock_request.assert_called_with("GET", "https://open.teambition.com/api/org/info", headers=self.api._get_headers(), params={})
+
+    def test_resolve_query_tasks_filter_mutually_exclusive_with_task_ids(self):
+        """官方文档 taskId 与 filter 模式互斥：有 task_ids 时不应生成 filter。"""
+        self.assertIsNone(resolve_param("build_task_filter", {"task_ids": ["a", "b"]}))
+        f = resolve_param("build_task_filter", {"project_id": "p1"})
+        self.assertIn("p1", f)
+        self.assertEqual(resolve_param("build_task_id_query_param", {"task_ids": ["a", "b"]}), "a,b")
+        self.assertEqual(resolve_param("build_task_id_query_param", {"taskId": "single"}), "single")
 
     def test_api_result_list_null(self):
         """result 为 null 时须得到空列表，避免 NoneType 不可迭代。"""

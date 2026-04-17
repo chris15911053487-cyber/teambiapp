@@ -230,13 +230,23 @@ DEFAULT_API_CONFIGS = [
     },
     {
         "name": "query_tasks",
-        "description": "查询任务详情 (支持 filter.projectId)",
+        "description": (
+            "查询任务详情 GET /v3/task/query。权限: tb-core:task:get。文档: "
+            "https://open.teambition.com/docs/apis/6321c6d2912d20d3b5a4a7b8 。\n"
+            "请求头: Authorization(Bearer)、X-Tenant-Id、X-Tenant-type=organization（客户端已带）；"
+            "可选 x-operator-id（成员视角，context 传 operator_id）。\n"
+            "Query 两类用法: A) 按项目分页列表 — filter(JSON 字符串，含 projectId 可选 stageId) + pageSize + pageToken；"
+            "B) 按标识查详情 — taskId(逗号分隔，与 parentTaskId 二选一) 或 shortIds 或 parentTaskId，勿与 filter 混用。"
+        ),
         "method": "GET",
         "endpoint": "/v3/task/query",
         "default_params": {"pageSize": 50},
         "resolvers": {
             "filter": "build_task_filter",
-            "pageToken": "from_context"
+            "pageToken": "from_context",
+            "taskId": "build_task_id_query_param",
+            "shortIds": "build_short_ids_query_param",
+            "parentTaskId": "parent_task_id_from_context",
         },
         "response_key": "result",
         "pagination": True
@@ -319,15 +329,35 @@ def resolve_param(resolver_name: str, context: dict, api_config: dict = None):
                 return context.get(key)
         return None
     elif resolver_name == "build_task_filter":
-        # 构建 task/query 的 filter JSON
+        # 构建 task/query 的 filter JSON（与官方文档「按 taskId/shortIds/parentTaskId」查询互斥）
+        tid = context.get("task_ids") or context.get("taskId")
+        sid = context.get("short_ids") or context.get("shortIds")
+        ptid = context.get("parent_task_id") or context.get("parentTaskId")
+        if tid or sid or ptid:
+            return None
         project_id = context.get("project_id") or context.get("projectId")
         if project_id:
             filter_dict = {"projectId": project_id}
-            # 可扩展 stageId 等
             if "stage_id" in context or "stageId" in context:
                 filter_dict["stageId"] = context.get("stage_id") or context.get("stageId")
             return json.dumps(filter_dict)
         return json.dumps({"projectId": "all"})  # fallback
+    elif resolver_name == "build_task_id_query_param":
+        tid = context.get("task_ids") or context.get("taskId")
+        if not tid:
+            return None
+        if isinstance(tid, (list, tuple)):
+            return ",".join(str(x) for x in tid)
+        return str(tid).strip()
+    elif resolver_name == "build_short_ids_query_param":
+        sid = context.get("short_ids") or context.get("shortIds")
+        if not sid:
+            return None
+        if isinstance(sid, (list, tuple)):
+            return ",".join(str(x) for x in sid)
+        return str(sid).strip()
+    elif resolver_name == "parent_task_id_from_context":
+        return context.get("parent_task_id") or context.get("parentTaskId")
     elif resolver_name == "get_token":
         return st.session_state.get("token", "")
     elif resolver_name == "get_tenant_id":
@@ -714,7 +744,16 @@ API 权限错误: {error_message} (code: {code})
                 params_or_body[param_name] = value
 
         # Context 覆盖 (优先级最高)；不传内部键到 HTTP query/body
-        _internal_ctx_keys = frozenset({"api_name", "extract_key"})
+        _internal_ctx_keys = frozenset({
+            "api_name",
+            "extract_key",
+            "operator_id",
+            "operatorId",
+            "project_id",
+            "task_ids",
+            "short_ids",
+            "parent_task_id",
+        })
         for k, v in context.items():
             if k in _internal_ctx_keys:
                 continue
@@ -726,6 +765,10 @@ API 权限错误: {error_message} (code: {code})
 
         # 调用 (GET 用 params, 其他用 json body)
         kwargs = {"params": params_or_body} if method.upper() == "GET" else {"json": params_or_body}
+
+        oid = context.get("operator_id") or context.get("operatorId")
+        if oid:
+            kwargs["headers"] = {"x-operator-id": str(oid)}
 
         result = self._request(method, endpoint, **kwargs)
 
@@ -1884,7 +1927,8 @@ def api_config_page():
 - **resolvers**: 键值对，如 `{"filter": "build_task_filter", "projectId": "from_context"}` - 动态从 context/session 取值
 - **default_params**: 默认 query 参数 (dict)
 - **endpoint**: 支持模板如 `/v3/project/{projectId}/stage/search`
-- 测试时提供 context JSON 来模拟参数 (project_id, pageToken 等)
+- 测试时提供 context JSON 来模拟参数 (project_id, pageToken, task_ids, operator_id 等)
+- **`query_tasks`** 与[官方文档](https://open.teambition.com/docs/apis/6321c6d2912d20d3b5a4a7b8)一致：按项目用 `project_id`+分页；按 ID 用 `taskId`/`task_ids` 或 `shortIds`/`short_ids` 或 `parentTaskId`；可选 `operator_id` 走请求头 `x-operator-id`
 - 所有调用自动通过 `_request` 记录调试日志 (在「API记录」页查看)
 
 **预置接口** 已包含企业、项目、任务、阶段、工时。 可通过编辑器添加新接口而无需修改代码。
