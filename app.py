@@ -1321,7 +1321,8 @@ def display_data():
             with col1:
                 st.metric("企业名称", org.get('name', 'N/A'))
             with col2:
-                st.metric("企业 ID", org.get('orgId', 'N/A'))
+                org_id = org.get("orgId") or org.get("id") or st.session_state.get("tenant_id")
+                st.metric("企业 ID", org_id or "N/A")
             with col3:
                 st.metric("创建时间", org.get('created', 'N/A'))
 
@@ -1825,7 +1826,10 @@ def data_center_page():
         if st.button("获取企业信息", type="primary"):
             try:
                 org = client.call("get_org_info")
-                st.session_state.org_data = org
+                # call() 返回完整响应；与 main_page 拉取逻辑一致，只存 result 供 display_data 使用
+                st.session_state.org_data = (
+                    org.get("result", {}) if isinstance(org, dict) else {}
+                )
                 st.success("✅ 企业信息获取成功")
                 st.json(org)
             except Exception as e:
