@@ -141,9 +141,9 @@ docker-compose up -d
 ## 技术说明
 
 - **项目分页**：Open API v3 的 `/v3/project/query` 使用 **游标分页** (`pageToken`/`nextPageToken`)。
-- **任务查询**：新增 `search_project_stages()`（`/v3/project/{projectId}/stage/search`）和 `query_tasks()`（已按官方文档 https://open.teambition.com/docs/apis/6321c6d2912d20d3b5a4a7b8 优化）。
-  - **优先使用项目专属接口** `/v3/project/{projectId}/task/query`（更稳定，权限要求较低）。
-  - 全局 `/v3/task/query` 现在正确使用 `filter` 参数（JSON 序列化后作为 query string），解决之前「Invalid parameter」问题。
+- **任务查询**：新增 `search_project_stages()`（`/v3/project/{projectId}/stage/search`）和 `query_tasks()`。
+  - **项目列表**：`/v3/project/{projectId}/task/query` 使用 `pageSize` / `pageToken` 拉取该项目下任务（与 `get_project_tasks()` 一致）。
+  - **全局按 ID 查询** `/v3/task/query` 以[官方文档](https://open.teambition.com/docs/apis/6321c6d2912d20d3b5a4a7b8)为准：query 为 `taskId`、`shortIds`、`parentTaskId`（`taskId` 与 `parentTaskId` 二选一），**不是** `filter` / `pageSize`。
   - 自动获取阶段信息并映射到任务的 `stageName`。
   - 增强 `_request()` + 调试面板（一键复制含完整 Token 的 cURL，便于 Postman 导入）。
 - **新增「任务」菜单**：独立页面，专注任务+阶段查询，解决常见「已授权但提示无权限」问题。

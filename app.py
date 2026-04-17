@@ -334,36 +334,72 @@ API 权限错误: {error_message} (code: {code})
         result = self._request("GET", f"/v3/project/{project_id}/stage/search", params=params)
         return result.get("result", [])
 
-    def query_tasks(self, project_id: str = None, stage_id: str = None, page_size: int = 50, page_token=None):
-        """通用任务查询接口（已按官方文档调整参数结构）。
-        根据 https://open.teambition.com/docs/apis/6321c6d2912d20d3b5a4a7b8 文档：
-        - 项目专属接口：/v3/project/{projectId}/task/query （推荐，权限更窄）
-        - 全局接口：/v3/task/query 需要使用 filter 对象传递 projectId/stageId 等过滤条件
+    @staticmethod
+    def _comma_separated_ids(ids):
+        if ids is None:
+            return None
+        if isinstance(ids, (list, tuple)):
+            return ",".join(str(x) for x in ids)
+        return str(ids).strip()
+
+    def query_tasks(
+        self,
+        project_id: str = None,
+        page_size: int = 50,
+        page_token=None,
+        *,
+        task_ids=None,
+        short_ids=None,
+        parent_task_id: str = None,
+        operator_id: str = None,
+    ):
+        """任务查询。
+
+        - **项目下列表**：``GET /v3/project/{projectId}/task/query``，使用 ``pageSize`` / ``pageToken``
+          游标分页（与项目列表等接口一致；权限常见为 ``tb-core:project.task:list``）。
+        - **全局按 ID 查任务详情**：``GET /v3/task/query``，见
+          https://open.teambition.com/docs/apis/6321c6d2912d20d3b5a4a7b8
+          —— query 仅含 ``taskId``、``shortIds``、``parentTaskId``（``taskId`` 与 ``parentTaskId``
+          二选一），**无** ``pageSize`` / ``filter``；权限为 ``tb-core:task:get``。
+          可选请求头 ``x-operator-id``（``operator_id``）表示查询人，会按该成员可见范围过滤。
         """
+        extra_headers = {"x-operator-id": operator_id} if operator_id else None
+
         if project_id:
-            # 优先使用项目专属接口（更高效，所需权限更明确）
             endpoint = f"/v3/project/{project_id}/task/query"
             params = {"pageSize": page_size}
             if page_token:
                 params["pageToken"] = page_token
-            # 项目专属接口通常支持顶层 projectId/stageId（但此处已通过路径传递）
-        else:
-            # 全局 /v3/task/query 按文档要求使用 filter 参数
-            endpoint = "/v3/task/query"
-            params = {"pageSize": page_size}
-            if page_token:
-                params["pageToken"] = page_token
+            req_kwargs = {"params": params}
+            if extra_headers:
+                req_kwargs["headers"] = extra_headers
+            result = self._request("GET", endpoint, **req_kwargs)
+            return result.get("result", []), self.project_query_next_token(result)
 
-            filter_dict = {}
-            if project_id:
-                filter_dict["projectId"] = project_id
-            if stage_id:
-                filter_dict["stageId"] = stage_id
-            if filter_dict:
-                params["filter"] = json.dumps(filter_dict)  # GET 时序列化为字符串
+        tid = self._comma_separated_ids(task_ids)
+        sid = self._comma_separated_ids(short_ids)
+        if tid and parent_task_id:
+            raise ValueError("官方文档：taskId 与 parentTaskId 不能同时使用")
+        if not tid and not sid and not parent_task_id:
+            raise ValueError(
+                "全局 /v3/task/query 须提供 task_ids、short_ids 或 parent_task_id 之一；"
+                "拉取某项目下全部任务请传入 project_id 使用 /v3/project/{projectId}/task/query"
+            )
 
-        result = self._request("GET", endpoint, params=params)
-        return result.get("result", []), self.project_query_next_token(result)
+        params = {}
+        if tid:
+            params["taskId"] = tid
+        if sid:
+            params["shortIds"] = sid
+        if parent_task_id:
+            params["parentTaskId"] = parent_task_id
+
+        req_kwargs = {"params": params}
+        if extra_headers:
+            req_kwargs["headers"] = extra_headers
+        result = self._request("GET", "/v3/task/query", **req_kwargs)
+        # 文档未描述该接口的分页字段；按 ID 查询一般为单次结果
+        return result.get("result", []), None
 
     def get_all_project_tasks(self, projects, page_size: int = 50):
         """获取所有项目的任务（增强版，支持阶段信息）"""
@@ -1357,7 +1393,7 @@ def tasks_page():
             try:
                 with st.spinner(f"查询 {project_name} ..."):
                     stages = client.search_project_stages(project_id)
-                    tasks, _ = client.query_tasks(project_id=project_id, page_size=100)
+                    tasks = client.get_project_tasks(project_id, page_size=100)
                     stage_map = {s.get('id'): s.get('name', '未命名阶段') for s in stages}
 
                     st.session_state.tasks_data = {

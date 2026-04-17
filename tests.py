@@ -127,6 +127,34 @@ class TestTeambitionAPI(unittest.TestCase):
         mock_request.assert_called_with("GET", "https://open.teambition.com/api/v3/project/project_123/task/query",
                                       headers=self.api._get_headers(), params={"pageSize": 20})
 
+    @patch('app.requests.request')
+    def test_query_tasks_global_by_task_ids(self, mock_request):
+        """全局 /v3/task/query：官方文档参数 taskId（逗号分隔）"""
+        mock_response = Mock()
+        mock_response.json.return_value = {"code": 200, "result": [{"id": "t1"}]}
+        mock_request.return_value = mock_response
+
+        tasks, next_token = self.api.query_tasks(task_ids=["a", "b"])
+
+        self.assertEqual(tasks, [{"id": "t1"}])
+        self.assertIsNone(next_token)
+        mock_request.assert_called_with(
+            "GET",
+            "https://open.teambition.com/api/v3/task/query",
+            headers=self.api._get_headers(),
+            params={"taskId": "a,b"},
+        )
+
+    def test_query_tasks_global_requires_identifier(self):
+        """全局查询未提供 task_ids / short_ids / parent_task_id 时应报错"""
+        with self.assertRaises(ValueError):
+            self.api.query_tasks()
+
+    def test_query_tasks_global_taskid_parent_conflict(self):
+        """taskId 与 parentTaskId 不可同时出现"""
+        with self.assertRaises(ValueError):
+            self.api.query_tasks(task_ids="x", parent_task_id="y")
+
 
 class TestUtilityFunctions(unittest.TestCase):
     """测试工具函数"""
