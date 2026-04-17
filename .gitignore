@@ -40,5 +40,5 @@ data/
 *.xls
 *.csv
 
-# Streamlit
-.streamlit/
+# Streamlit（主题配置可入库；密钥勿提交）
+.streamlit/secrets.toml

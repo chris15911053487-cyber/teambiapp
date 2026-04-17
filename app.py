@@ -119,8 +119,18 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    .main-header { font-size: 2rem; font-weight: 700; color: #0f172a; margin-bottom: 0.35rem; }
-    .subtle { color: #64748b; font-size: 0.95rem; margin-bottom: 1.25rem; }
+    /* 与系统/浏览器深色主题及 Streamlit 暗色主题对齐，避免大块白底 */
+    .main-header {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--text-color, #f1f5f9);
+        margin-bottom: 0.35rem;
+    }
+    .subtle {
+        color: var(--secondary-text-color, #94a3b8);
+        font-size: 0.95rem;
+        margin-bottom: 1.25rem;
+    }
     .hero {
         background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 55%, #3b82f6 100%);
         color: #fff;
@@ -132,21 +142,38 @@ st.markdown("""
     .hero h1 { margin: 0; font-size: 1.65rem; font-weight: 700; letter-spacing: -0.02em; }
     .hero p { margin: 0.45rem 0 0 0; opacity: 0.92; font-size: 0.98rem; }
     .panel {
-        border: 1px solid #e2e8f0;
+        border: 1px solid #334155;
         border-radius: 12px;
         padding: 1rem 1.1rem;
-        background: #f8fafc;
+        background: rgba(30, 41, 59, 0.55);
         margin-bottom: 0.75rem;
     }
     .card {
         border-radius: 12px;
         padding: 18px;
         margin: 10px 0;
-        box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
-        border: 1px solid #e2e8f0;
-        background: #fff;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+        border: 1px solid #334155;
+        background: rgba(30, 41, 59, 0.65);
     }
     div[data-testid="stTabs"] button { font-weight: 600; }
+    /* st.metric：避免白底卡片 */
+    [data-testid="stMetricContainer"],
+    div[data-testid="stMetricContainer"] {
+        background-color: rgba(30, 41, 59, 0.85) !important;
+        border: 1px solid #334155 !important;
+        border-radius: 12px !important;
+        padding: 0.75rem 1rem !important;
+    }
+    [data-testid="stMetricContainer"] [data-testid="stMetricLabel"] p,
+    [data-testid="stMetricContainer"] label p {
+        color: #94a3b8 !important;
+    }
+    [data-testid="stMetricContainer"] [data-testid="stMetricValue"] {
+        color: #f1f5f9 !important;
+    }
+    /* 表单 / 子标题在暗色下的可读性 */
+    .stMarkdown h2, .stMarkdown h3 { color: var(--text-color, #e2e8f0); }
 </style>
 """, unsafe_allow_html=True)
 
@@ -677,8 +704,8 @@ def app_menu():
     with st.sidebar:
         st.markdown(
             "<div style='text-align:center;padding:0.25rem 0 0.75rem 0;'>"
-            "<div style='font-size:1.15rem;font-weight:700;color:#1e40af;'>Teambition</div>"
-            "<div style='color:#64748b;font-size:0.85rem;margin-top:2px;'>数据工作台</div></div>",
+            "<div style='font-size:1.15rem;font-weight:700;color:#60a5fa;'>Teambition</div>"
+            "<div style='color:#94a3b8;font-size:0.85rem;margin-top:2px;'>数据工作台</div></div>",
             unsafe_allow_html=True,
         )
 
@@ -689,13 +716,20 @@ def app_menu():
             menu_icon="window-sidebar",
             default_index=0,
             styles={
-                "container": {"padding": "6px 4px", "border-radius": "12px", "background-color": "#f1f5f9"},
-                "icon": {"color": "#2563eb", "font-size": "18px"},
+                "container": {
+                    "padding": "6px 4px",
+                    "border-radius": "12px",
+                    "background-color": "#0f172a",
+                    "border": "1px solid #334155",
+                },
+                "icon": {"color": "#60a5fa", "font-size": "18px"},
                 "nav-link": {
                     "font-size": "14px",
                     "text-align": "left",
                     "margin": "4px 0",
                     "padding": "10px 14px",
+                    "color": "#e2e8f0",
+                    "background-color": "transparent",
                 },
                 "nav-link-selected": {"background-color": "#2563eb", "color": "white"},
             },
@@ -756,7 +790,13 @@ def auth_page():
 
     st.info("**推荐流程**: 使用侧边栏输入 App ID/Secret 点击获取，或手动输入 Token。暗号验证使用 config_sidebar 逻辑。")
 
-    style_metric_cards()
+    style_metric_cards(
+        background_color="#1e293b",
+        border_color="#334155",
+        border_radius_px=12,
+        border_left_color="#3b82f6",
+        box_shadow=False,
+    )
 
 
 def about_page():
@@ -1408,7 +1448,13 @@ def export_data():
             sheet_count = base_sheets + task_sheets + worktime_sheets
             st.metric("Excel工作表", f"{sheet_count} 个")
 
-        style_metric_cards()
+        style_metric_cards(
+            background_color="#1e293b",
+            border_color="#334155",
+            border_radius_px=12,
+            border_left_color="#3b82f6",
+            box_shadow=False,
+        )
 
     # 导出按钮
     if st.button("📊 生成并下载 Excel 文件", use_container_width=True, type="primary"):

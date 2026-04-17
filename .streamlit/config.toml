@@ -1,0 +1,8 @@
+# 与系统/浏览器深色主题一致，避免大块浅色控件与暗色背景不协调
+[theme]
+base = "dark"
+primaryColor = "#2563eb"
+backgroundColor = "#0e1117"
+secondaryBackgroundColor = "#1e293b"
+textColor = "#f1f5f9"
+font = "sans serif"
