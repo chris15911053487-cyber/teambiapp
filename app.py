@@ -293,6 +293,22 @@ def _dedupe_camel_snake_query_aliases(params: dict) -> None:
             del params[snake]
 
 
+def _api_result_list(payload, key="result"):
+    """Teambition 响应里 result 可能为 null。
+
+    ``payload.get(key, [])`` 在 key 存在且值为 ``None`` 时仍返回 ``None``（不会用默认值），
+    会导致 ``for x in ...`` / ``list.extend`` 报 ``NoneType`` 不可迭代。
+    """
+    if not isinstance(payload, dict):
+        return []
+    val = payload.get(key)
+    if val is None:
+        return []
+    if isinstance(val, list):
+        return val
+    return [val]
+
+
 # Resolver 函数注册表 - 动态解析参数
 def resolve_param(resolver_name: str, context: dict, api_config: dict = None):
     """根据 resolver 类型从 context 或 session_state 解析参数值"""
@@ -532,7 +548,7 @@ API 权限错误: {error_message} (code: {code})
         """
         params = {"pageSize": page_size}
         result = self._request("GET", f"/v3/project/{project_id}/stage/search", params=params)
-        return result.get("result", [])
+        return _api_result_list(result)
 
     @staticmethod
     def _comma_separated_ids(ids):
@@ -580,7 +596,7 @@ API 权限错误: {error_message} (code: {code})
             if extra_headers:
                 req_kwargs["headers"] = extra_headers
             result = self._request("GET", "/v3/task/query", **req_kwargs)
-            return result.get("result", []), self.project_query_next_token(result)
+            return _api_result_list(result), self.project_query_next_token(result)
 
         tid = self._comma_separated_ids(task_ids)
         sid = self._comma_separated_ids(short_ids)
@@ -605,7 +621,7 @@ API 权限错误: {error_message} (code: {code})
             req_kwargs["headers"] = extra_headers
         result = self._request("GET", "/v3/task/query", **req_kwargs)
         # 文档未描述该接口的分页字段；按 ID 查询一般为单次结果
-        return result.get("result", []), None
+        return _api_result_list(result), None
 
     def get_all_project_tasks(self, projects, page_size: int = 50):
         """获取所有项目的任务（增强版，支持阶段信息）"""
@@ -617,7 +633,11 @@ API 权限错误: {error_message} (code: {code})
             try:
                 # 先获取该项目的阶段（可选，用于丰富任务展示）
                 stages = self.search_project_stages(project_id, page_size)
-                stage_map = {s.get('id'): s.get('name', '未命名') for s in stages}
+                stage_map = {
+                    s.get("id"): s.get("name", "未命名")
+                    for s in stages
+                    if isinstance(s, dict)
+                }
 
                 # 获取任务
                 tasks = []
@@ -648,7 +668,7 @@ API 权限错误: {error_message} (code: {code})
     def get_task_worktime(self, task_id: str):
         """获取任务工时"""
         result = self._request("GET", f"/worktime/aggregation/task/{task_id}")
-        return result.get("result", [])
+        return _api_result_list(result)
 
     # ====================== 新增：API Registry & Dynamic Call ======================
     def get_config(self, name: str) -> dict:
@@ -1025,7 +1045,7 @@ def main_page():
                             )
                             if total:
                                 total = int(total)
-                            projects = first_page.get("result", [])
+                            projects = _api_result_list(first_page)
                             if total > 0:
                                 estimated_pages = (total + 50 - 1) // 50
                             elif len(projects) > 0:
@@ -1046,7 +1066,7 @@ def main_page():
                 
                 if st.session_state.projects_analysis_ready and st.session_state.projects_analysis_api_response is not None:
                     first_page = st.session_state.projects_analysis_api_response
-                    projects = first_page.get("result", [])
+                    projects = _api_result_list(first_page)
                     estimated_pages = st.session_state.projects_estimated_pages
                     total = (
                         first_page.get("total")
@@ -1967,13 +1987,14 @@ def api_records_page():
     st.markdown("所有通过 TeambitionAPI 发出的请求记录在此 (含请求/响应/cURL)。")
 
     init_session_state()
-    if not st.session_state.get("api_requests"):
-        st.info("暂无记录。启用调试模式并执行操作后会自动记录。")
-        if st.button("🪲 启用调试模式"):
-            st.session_state.debug_mode = True
-        return
+    # 与 _request 中 debug_mode 一致；开关比按钮更易发现
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.toggle("🪲 启用调试模式（记录 API 请求报文）", key="debug_mode")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    st.toggle("显示调试模式", value=st.session_state.get("debug_mode", False), key="debug_toggle")
+    if not st.session_state.get("api_requests"):
+        st.info("暂无记录。打开上方开关后，在「数据中心」等页面发起请求，将自动记录在此。")
+        return
 
     # Filters
     col1, col2 = st.columns(2)

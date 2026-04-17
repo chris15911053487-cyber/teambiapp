@@ -12,7 +12,7 @@ import os
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app import TeambitionAPI, get_api_client, to_excel, DEFAULT_API_CONFIGS
+from app import TeambitionAPI, get_api_client, to_excel, DEFAULT_API_CONFIGS, _api_result_list
 import pandas as pd
 
 
@@ -96,6 +96,23 @@ class TestTeambitionAPI(unittest.TestCase):
 
         self.assertEqual(result, {"code": 200, "result": {"name": "Test Org"}})
         mock_request.assert_called_with("GET", "https://open.teambition.com/api/org/info", headers=self.api._get_headers(), params={})
+
+    def test_api_result_list_null(self):
+        """result 为 null 时须得到空列表，避免 NoneType 不可迭代。"""
+        self.assertEqual(_api_result_list({"code": 200, "result": None}), [])
+        self.assertEqual(_api_result_list({"code": 200}), [])
+        self.assertEqual(_api_result_list({"result": [{"id": "1"}]}), [{"id": "1"}])
+        self.assertEqual(_api_result_list({"result": {"id": "one"}}), [{"id": "one"}])
+
+    @patch('app.requests.request')
+    @patch('app.st.session_state')
+    def test_search_project_stages_null_result(self, mock_session, mock_request):
+        """接口返回 result: null 时阶段列表应为 []。"""
+        mock_session.get.return_value = False
+        mock_response = Mock()
+        mock_response.json.return_value = {"code": 200, "result": None}
+        mock_request.return_value = mock_response
+        self.assertEqual(self.api.search_project_stages("proj_x"), [])
 
     @patch('app.requests.request')
     def test_get_projects(self, mock_request):
