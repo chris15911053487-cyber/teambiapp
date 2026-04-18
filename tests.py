@@ -138,6 +138,8 @@ class TestTeambitionAPI(unittest.TestCase):
         self.assertEqual(_coerce_api_json_dict(None), {})
         self.assertEqual(_coerce_api_json_dict(""), {})
         self.assertEqual(_coerce_api_json_dict('{"pageSize": 50}'), {"pageSize": 50})
+        # 与 JSON 不同：Python 字典字面量（单引号）在界面里常被误粘贴
+        self.assertEqual(_coerce_api_json_dict("{'pageSize': 50}"), {"pageSize": 50})
         self.assertEqual(_coerce_api_json_dict({"a": 1}), {"a": 1})
 
     def test_api_result_list_null(self):

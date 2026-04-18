@@ -5,6 +5,7 @@ Teambition API Web 应用
 使用 Streamlit 构建图形界面
 """
 
+import ast
 import json
 import re
 import streamlit as st
@@ -347,8 +348,14 @@ def _coerce_api_json_dict(value, field_label: str = "字段") -> dict:
             return {}
         try:
             parsed = json.loads(text)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"{field_label} 不是合法 JSON 对象: {e}") from e
+        except json.JSONDecodeError:
+            # 常见误用：粘贴 Python 字典字面量（单引号），如 {'pageSize': 50}
+            try:
+                parsed = ast.literal_eval(text)
+            except (ValueError, SyntaxError) as e:
+                raise ValueError(
+                    f"{field_label} 不是合法 JSON 对象（需双引号键名，或使用 Python 字典字面量）: {e}"
+                ) from e
         if not isinstance(parsed, dict):
             raise ValueError(f"{field_label} 应为 JSON 对象，当前为 {type(parsed).__name__}")
         return parsed
@@ -1820,8 +1827,8 @@ def api_config_page():
                 "description": st.column_config.TextColumn("描述", width="medium"),
                 "method": st.column_config.SelectboxColumn("Method", options=["GET", "POST"], width="small"),
                 "endpoint": st.column_config.TextColumn("Endpoint", width="medium"),
-                "default_params": st.column_config.TextColumn("默认参数 (JSON)", width="medium"),
-                "resolvers": st.column_config.TextColumn("Resolver (JSON)", width="medium"),
+                "default_params": st.column_config.TextColumn("默认参数 (JSON 或 Python dict)", width="medium"),
+                "resolvers": st.column_config.TextColumn("Resolver (JSON 或 Python dict)", width="medium"),
                 "response_key": st.column_config.TextColumn("响应键", default="result", width="small"),
                 "pagination": st.column_config.CheckboxColumn("分页", default=False),
             },
