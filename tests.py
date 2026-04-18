@@ -4,6 +4,7 @@
 Teambition API 工具 - 测试文件
 """
 
+import json
 import unittest
 from unittest.mock import Mock, patch
 import sys
@@ -12,7 +13,14 @@ import os
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app import TeambitionAPI, get_api_client, to_excel, DEFAULT_API_CONFIGS, _api_result_list
+from app import (
+    TeambitionAPI,
+    get_api_client,
+    to_excel,
+    DEFAULT_API_CONFIGS,
+    _api_result_list,
+    _coerce_api_json_dict,
+)
 import pandas as pd
 
 
@@ -96,6 +104,41 @@ class TestTeambitionAPI(unittest.TestCase):
 
         self.assertEqual(result, {"code": 200, "result": {"name": "Test Org"}})
         mock_request.assert_called_with("GET", "https://open.teambition.com/api/org/info", headers=self.api._get_headers(), params={})
+
+    @patch('app.requests.request')
+    @patch('app.st.session_state')
+    def test_get_org_info_string_json_columns(self, mock_session, mock_request):
+        """接口配置经 data_editor 后 default_params/resolvers 可能为 JSON 字符串。"""
+        str_configs = []
+        for c in DEFAULT_API_CONFIGS:
+            nc = dict(c)
+            nc["default_params"] = json.dumps(c.get("default_params") or {})
+            nc["resolvers"] = json.dumps(c.get("resolvers") or {})
+            str_configs.append(nc)
+
+        def mock_get(key, default=None):
+            if key == "api_configs":
+                return str_configs
+            if key == "debug_mode":
+                return False
+            return default
+
+        mock_session.get.side_effect = mock_get
+        mock_response = Mock()
+        mock_response.json.return_value = {"code": 200, "result": {"name": "Test Org"}}
+        mock_request.return_value = mock_response
+
+        result = self.api.get_org_info()
+        self.assertEqual(result, {"code": 200, "result": {"name": "Test Org"}})
+        mock_request.assert_called_with(
+            "GET", "https://open.teambition.com/api/org/info", headers=self.api._get_headers(), params={}
+        )
+
+    def test_coerce_api_json_dict(self):
+        self.assertEqual(_coerce_api_json_dict(None), {})
+        self.assertEqual(_coerce_api_json_dict(""), {})
+        self.assertEqual(_coerce_api_json_dict('{"pageSize": 50}'), {"pageSize": 50})
+        self.assertEqual(_coerce_api_json_dict({"a": 1}), {"a": 1})
 
     def test_api_result_list_null(self):
         """result 为 null 时须得到空列表，避免 NoneType 不可迭代。"""

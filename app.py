@@ -335,6 +335,26 @@ def resolve_param(resolver_name: str, context: dict, api_config: dict = None):
     return context.get(resolver_name)  # default fallback
 
 
+def _coerce_api_json_dict(value, field_label: str = "字段") -> dict:
+    """接口配置中 JSON 列在 data_editor / 上传文件中可能为 str，规范为 dict。"""
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return dict(value)
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return {}
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"{field_label} 不是合法 JSON 对象: {e}") from e
+        if not isinstance(parsed, dict):
+            raise ValueError(f"{field_label} 应为 JSON 对象，当前为 {type(parsed).__name__}")
+        return parsed
+    raise ValueError(f"{field_label} 类型不支持: {type(value).__name__}")
+
+
 # 初始化 session state 中的 API 配置
 def init_session_state():
     if "api_configs" not in st.session_state:
@@ -707,8 +727,10 @@ API 权限错误: {error_message} (code: {code})
         endpoint = self.resolve_endpoint(config["endpoint"], path_ctx)
 
         # 构建参数 (default + resolved + context override)
-        params_or_body = config.get("default_params", {}).copy()
-        for param_name, resolver_name in config.get("resolvers", {}).items():
+        # data_editor 将 default_params / resolvers 存成 JSON 字符串，不能直接 .copy()
+        params_or_body = _coerce_api_json_dict(config.get("default_params"), "default_params")
+        resolvers_map = _coerce_api_json_dict(config.get("resolvers"), "resolvers")
+        for param_name, resolver_name in resolvers_map.items():
             value = resolve_param(resolver_name, {**path_ctx, "api_name": name}, config)
             if value is not None:
                 params_or_body[param_name] = value
