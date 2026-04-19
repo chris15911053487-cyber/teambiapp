@@ -68,8 +68,13 @@ def format_api_debug_bundle(req: dict) -> str:
     else:
         lines.append("  (无)")
     lines.extend(["", "--- HTTP 响应 ---"])
-    lines.append(f"HTTP 状态码: {req.get('http_status', 'N/A')}")
-    lines.append(f"业务 code: {req.get('response_code', req.get('status', 'N/A'))}")
+    http_st = req.get("http_status")
+    lines.append(f"HTTP 状态码: {http_st if http_st is not None else 'N/A'}")
+    biz = req.get("response_code")
+    if biz is not None:
+        lines.append(f"业务 code: {biz}")
+    else:
+        lines.append(f"业务 code: {req.get('status', 'N/A')}")
     if req.get("error_message"):
         lines.append(f"errorMessage: {req['error_message']}")
     lines.extend(["", "响应 JSON:"])
@@ -412,7 +417,8 @@ class TeambitionAPI:
         if "headers" in kwargs:
             headers.update(kwargs.pop("headers"))
 
-        # 记录请求报文（调试模式）
+        # 记录请求报文（调试模式）；用同一 dict 引用更新，避免异常时永远停在 pending
+        request_log = None
         if st.session_state.get("debug_mode"):
             import datetime
             timestamp = datetime.datetime.now().strftime("%H:%M:%S")
@@ -442,30 +448,30 @@ class TeambitionAPI:
             if len(st.session_state.api_requests) > 20:
                 st.session_state.api_requests = st.session_state.api_requests[:20]
 
-        response = requests.request(method, url, headers=headers, **kwargs)
+        response = None
         try:
-            result = response.json()
-        except ValueError:
-            result = {"_parse_error": "响应非 JSON", "text": response.text[:2000]}
+            response = requests.request(method, url, headers=headers, **kwargs)
+            try:
+                result = response.json()
+            except ValueError:
+                result = {"_parse_error": "响应非 JSON", "text": response.text[:2000]}
 
-        code = result.get("code") if isinstance(result, dict) else None
-        error_message = result.get("errorMessage", "") if isinstance(result, dict) else ""
+            code = result.get("code") if isinstance(result, dict) else None
+            error_message = result.get("errorMessage", "") if isinstance(result, dict) else ""
 
-        # 更新最后一条请求的状态（调试模式）
-        if st.session_state.get("debug_mode") and st.session_state.get("api_requests"):
-            last_request = st.session_state.api_requests[0]
-            last_request["http_status"] = response.status_code
-            last_request["status"] = code if code is not None else response.status_code
-            last_request["response_code"] = code
-            last_request["error_message"] = error_message
-            last_request["response_json"] = result if isinstance(result, dict) else {"_raw": str(result)}
-            if isinstance(result, dict) and "result" in result:
-                last_request["response_summary"] = f"{len(str(result.get('result', '')))} chars"
+            if request_log is not None:
+                request_log["http_status"] = response.status_code
+                request_log["status"] = code if code is not None else response.status_code
+                request_log["response_code"] = code
+                request_log["error_message"] = error_message
+                request_log["response_json"] = result if isinstance(result, dict) else {"_raw": str(result)}
+                if isinstance(result, dict) and "result" in result:
+                    request_log["response_summary"] = f"{len(str(result.get('result', '')))} chars"
 
-        if code is not None and code not in [0, 200]:
-            # 增强权限错误提示
-            if code in [403, 10133] or "permission" in error_message.lower() or "权限" in error_message or "authorization" in error_message.lower():
-                error_detail = f"""
+            if code is not None and code not in [0, 200]:
+                # 增强权限错误提示
+                if code in [403, 10133] or "permission" in error_message.lower() or "权限" in error_message or "authorization" in error_message.lower():
+                    error_detail = f"""
 API 权限错误: {error_message} (code: {code})
 
 常见原因及解决办法：
@@ -476,12 +482,44 @@ API 权限错误: {error_message} (code: {code})
 2. 保存权限变更后，**必须重新生成 Token**（重新在「配置」页验证暗号）
 3. 确认 X-Tenant-Id 与 Token 所属企业一致
 4. 检查项目是否在应用可见范围内
-                """.strip()
-                raise Exception(error_detail)
-            else:
-                raise Exception(f"API 错误: {error_message} (code: {code})")
+                    """.strip()
+                    raise Exception(error_detail)
+                else:
+                    raise Exception(f"API 错误: {error_message} (code: {code})")
 
-        return result
+            return result
+
+        except requests.RequestException as e:
+            if request_log is not None:
+                resp = getattr(e, "response", None)
+                request_log["http_status"] = resp.status_code if resp is not None else None
+                request_log["status"] = "request_error"
+                request_log["response_code"] = None
+                request_log["error_message"] = str(e)
+                body = None
+                if resp is not None:
+                    try:
+                        body = resp.text[:2000]
+                    except Exception:
+                        body = None
+                request_log["response_json"] = {
+                    "_client_error": type(e).__name__,
+                    "detail": str(e),
+                    **({"response_text": body} if body else {}),
+                }
+            raise
+
+        except Exception as err:
+            if request_log is not None and request_log.get("status") == "pending":
+                request_log["http_status"] = getattr(response, "status_code", None) if response is not None else None
+                request_log["status"] = "client_error"
+                request_log["response_code"] = None
+                request_log["error_message"] = str(err)
+                request_log["response_json"] = {
+                    "_exception": type(err).__name__,
+                    "detail": str(err),
+                }
+            raise
     
     def get_org_info(self):
         """获取企业信息"""
