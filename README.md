@@ -271,6 +271,24 @@ cd apps/frontend && echo 'NEXT_PUBLIC_API_URL=http://127.0.0.1:8000' > .env.loca
 npm run dev
 ```
 
+### 分步拉取任务（FastAPI + Next.js）
+
+大量项目时，一次性 `POST /data/tasks/fetch-all` 会长时间占用连接且无法观察进度。现提供 **分步任务**（每步一次开放平台调用：拉取某项目的阶段，或拉取一页任务）：
+
+| 端点 | 说明 |
+|------|------|
+| `POST /api/v1/data/tasks/fetch/jobs` | 创建任务；Body：`{ "page_size": 50 }`。返回 `jobId`、`projectCount`。会先请求一次项目列表。 |
+| `POST /api/v1/data/tasks/fetch/jobs/{jobId}/step` | 执行一步；返回 `done`、`cancelled`、`failed`、`tasksByProject`（已合并部分结果）、`progress`。循环调用直至 `done` 或 `cancelled`/`failed`。 |
+| `GET /api/v1/data/tasks/fetch/jobs/{jobId}` | 查询当前进度与合并后的 `tasksByProject`。 |
+| `POST /api/v1/data/tasks/fetch/jobs/{jobId}/cancel` | 停止：后续 `step` 不再调用 Teambition，并保留已拉取数据。 |
+| `POST /api/v1/data/tasks/fetch/jobs/{jobId}/resume` | 仅当任务为 **已停止** 时可恢复，从断点继续 `step`。 |
+
+**说明**：`jobId` 状态仅保存在 **后端进程内存** 中；进程重启或部署后任务丢失，需重新「开始拉取」。保留接口 `POST /data/tasks/fetch-all` 作为一次性全量拉取兼容。
+
+前端 **「任务」** 页（`/tasks`）提供：进度条与阶段文案、与导出一致的 **表格预览**（前 200 行）、**开始 / 停止 / 恢复** 按钮；数据写入 Zustand 工作区，与 **「导出 Excel」** 页共用。
+
+实现文件：`apps/backend/app/task_fetch_jobs.py`（状态机）、`apps/backend/app/routers/data.py`（路由）、`apps/frontend/app/(dashboard)/tasks/page.tsx`。
+
 ### Docker（现代栈）
 
 ```bash
