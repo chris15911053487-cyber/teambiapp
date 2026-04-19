@@ -24,9 +24,14 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt -r requirements-dev.txt
 
-    - name: Run tests
+    - name: Run tests (legacy Streamlit)
       run: |
         python -m pytest --cov-report=xml
+
+    - name: Teambition client tests
+      run: |
+        python -m pip install -e "./packages/teambition-client"
+        python -m pytest packages/teambition-client/tests -q
 
     - name: Backend (FastAPI) tests
       run: |
