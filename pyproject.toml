@@ -1,0 +1,9 @@
+[project]
+name = "teambition-app"
+version = "0.2.0"
+description = "Monorepo root (Streamlit legacy + Next.js + FastAPI modern stack)"
+readme = "README.md"
+requires-python = ">=3.11"
+
+[tool.uv]
+dev-dependencies = []

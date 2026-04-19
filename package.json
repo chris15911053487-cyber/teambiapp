@@ -1,0 +1,23 @@
+{
+  "name": "teambition-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --filter=frontend --filter=backend",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "backend:dev": "turbo run dev --filter=backend",
+    "frontend:dev": "turbo run dev --filter=frontend"
+  },
+  "devDependencies": {
+    "turbo": "latest",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0"
+  },
+  "packageManager": "npm@10.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

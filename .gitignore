@@ -28,6 +28,7 @@ wheels/
 .venv
 
 # IDE
+.cursor/
 .vscode/
 .idea/
 *.swp
@@ -42,3 +43,8 @@ data/
 
 # Streamlit（主题配置可入库；密钥勿提交）
 .streamlit/secrets.toml
+
+# Node / Turborepo
+node_modules/
+.turbo/
+apps/frontend/.next/

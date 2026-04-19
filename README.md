@@ -246,7 +246,40 @@ docker-compose logs -f
 
 ---
 
-## 文档与反馈
+## 前后端分离（Next.js + FastAPI + Turborepo）
+
+仓库根目录包含 **Turborepo** 工作区：`apps/frontend`（Next.js）、`apps/backend`（FastAPI）、`packages/teambition-client`（可复用 Open API 客户端）、`packages/types`（共享 TS 类型）。原有 **Streamlit** 入口（`app.py`）仍保留。
+
+### 环境变量（后端）
+
+在运行后端前配置 `TB_COMPANY_PROFILES_JSON`（JSON 数组，每项含 `name`、`app_id`、`app_secret`、`tenant_id`）。不要将真实密钥提交到公开仓库。可选：`REDIS_URL`（接口配置缓存）、`JWT_SECRET`（返回包装会话 JWT）、`CORS_ORIGINS`。
+
+### 本地开发
+
+```bash
+# 安装 Python 依赖（建议在 venv 中，Python 3.10+）
+python3 -m pip install -e ./packages/teambition-client
+python3 -m pip install -r apps/backend/requirements.txt -r apps/backend/requirements-dev.txt
+
+# 终端 1：后端（需 PYTHONPATH 指向 teambition-client 源码，或使用 editable install）
+cd apps/backend && PYTHONPATH=../../packages/teambition-client/src python3 -m uvicorn app.main:app --reload --port 8000
+
+# 终端 2：前端
+cd apps/frontend && echo 'NEXT_PUBLIC_API_URL=http://127.0.0.1:8000' > .env.local && npm install && npm run dev
+
+# 根目录一键（需已安装 turbo）
+npm run dev
+```
+
+### Docker（现代栈）
+
+```bash
+docker compose --profile modern up --build
+```
+
+默认 `docker compose up` 仍为 **Streamlit** 服务（端口 8501）。`--profile modern` 启动 Redis、后端（8000）、前端（3000）；`--profile worker` 额外启动 Celery worker（示例任务 `teambition.ping`）。
+
+### 文档与反馈
 
 - Teambition 开放平台：<https://open.teambition.com/docs>  
 - 问题反馈：在本仓库提交 Issue  

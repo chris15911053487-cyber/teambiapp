@@ -1,0 +1,11 @@
+{
+  "name": "@teambition/ui",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Reserved for shared UI primitives (optional).",
+  "scripts": {
+    "build": "echo \"no build\"",
+    "dev": "echo \"@teambition/ui: no dev server\"",
+    "lint": "echo \"skip\""
+  }
+}

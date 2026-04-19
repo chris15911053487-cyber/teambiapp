@@ -28,6 +28,11 @@ jobs:
       run: |
         python -m pytest --cov-report=xml
 
+    - name: Backend (FastAPI) tests
+      run: |
+        python3 -m pip install -q -r apps/backend/requirements.txt -r apps/backend/requirements-dev.txt
+        cd apps/backend && PYTHONPATH=../../packages/teambition-client/src:. python3 -m pytest tests -q
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:

@@ -1,0 +1,17 @@
+{
+  "name": "@teambition/types",
+  "version": "0.0.1",
+  "private": true,
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "echo \"@teambition/types: no dev server\"",
+    "lint": "echo \"types: no lint\""
+  },
+  "devDependencies": {
+    "typescript": "^5"
+  }
+}
